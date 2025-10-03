@@ -1,33 +1,34 @@
-% Xd and X are 13 dimensional, t is time(used for numerical integration)
-% We will also need control input u eventually
+% Xd and X are 13 dimensional state vectors
+% t is time(used for numerical integration)
+% will also need control input u eventually
 function Xd = Sat_template(t,X)
-  %Perturbation functions
+  % Perturbation functions
   F_J2 = J2(X);
 
-  %Constants
+  % Constants
   mu = 3.98e14;
   r = norm(X(1:3));
   I11 = ;
   I22 = ;
   I33 = ;
 
-  %2BP
+  % 2BP
   Xd(1) = X(4);
   Xd(2) = X(5);
   Xd(3) = X(6);
-  %extra forces and perturbations can be added here
+  % extra forces and perturbations can be added here
   Xd(4) = -mu*X(1)/r^3 + F_J2(1) +...;
   Xd(5) = -mu*X(2)/r^3 + F_J2(2) +...;
   Xd(6) = -mu*X(3)/r^3 + F_J2(3) +...;
 
-  %quaternion kinematics (states 7:10)
+  % quaternion kinematics (states 7:10)
   Xd(7) = -X(8)*X(11) - X(9)*X(12) - X(10)*X(13);
   Xd(8) = X(7)*X(11) - X(10)*X(12) + X(9)*X(13);
   Xd(9) = X(10)*X(11) + X(7)*X(12) - X(8)*X(13);
   Xd(10) = -X(9)*X(11) + X(8)*X(12) + X(7)*X(13);
 
-  %Kinetics(states 11:13)
-  %can add extra perturbations here 
+  % Kinetics(states 11:13)
+  % can add extra perturbations/Control inputs here 
   Xd(11) = -(I33 - I22)*X(12)*X(13)/I11 +...;
   Xd(12) = -(I11 - I33)*X(13)*X(11)/I22 +...;
   Xd(13) = -(I22 - I11)*X(11)*X(12)/I33 +...;
