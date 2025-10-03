@@ -12,7 +12,7 @@ function Xd = Sat_template(t,X)
   I22 = ;
   I33 = ;
 
-  % 2BP
+  % 2BP(states 1:6)
   Xd(1) = X(4);
   Xd(2) = X(5);
   Xd(3) = X(6);
