@@ -22,7 +22,7 @@ function Xd = Sat_template(t,X)
 
   % quaternion kinematics (states 7:10)
   B = [X(7) -X(8) -X(9) -X(10); x(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
-  Xd(7:10) = .5*B*X(11:13);
+  Xd(7:10) = .5*B*[0;X(11);X(12);X(13)];
 
   % Kinetics(states 11:13)
   % can add extra perturbations/Control inputs here 
