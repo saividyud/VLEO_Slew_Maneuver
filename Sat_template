@@ -1,36 +1,33 @@
 % Xd and X are 13 dimensional state vectors
+% X has to be vertical for function to work
 % t is time(used for numerical integration)
 % will also need control input u eventually
 function Xd = Sat_template(t,X)
+  %initialization
+  Xd = zeros(13,1);
+
   % Perturbation functions
   F_J2 = J2(X);
 
   % Constants
   mu = 3.98e14;
   r = norm(X(1:3));
-  I11 = ;
-  I22 = ;
-  I33 = ;
+  ICB = [I11 I12 I13; I21 I22 I23; I31 I32 I33];
 
   % 2BP(states 1:6)
-  Xd(1) = X(4);
-  Xd(2) = X(5);
-  Xd(3) = X(6);
+  Xd(1:3,1) = X(4:6);
+
   % extra forces and perturbations can be added here
-  Xd(4) = -mu*X(1)/r^3 + F_J2(1) +...;
-  Xd(5) = -mu*X(2)/r^3 + F_J2(2) +...;
-  Xd(6) = -mu*X(3)/r^3 + F_J2(3) +...;
+  Xd(4:6,1) = -mu*X(1:3)/r^3 + F_J2 + ...;
 
   % quaternion kinematics (states 7:10)
-  Xd(7) = -X(8)*X(11) - X(9)*X(12) - X(10)*X(13);
-  Xd(8) = X(7)*X(11) - X(10)*X(12) + X(9)*X(13);
-  Xd(9) = X(10)*X(11) + X(7)*X(12) - X(8)*X(13);
-  Xd(10) = -X(9)*X(11) + X(8)*X(12) + X(7)*X(13);
+  B = [X(7) -X(8) -X(9) -X(10); x(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
+  Xd(7:10,1) = .5*B*X(11:13);
 
   % Kinetics(states 11:13)
   % can add extra perturbations/Control inputs here 
-  Xd(11) = -(I33 - I22)*X(12)*X(13)/I11 +...;
-  Xd(12) = -(I11 - I33)*X(13)*X(11)/I22 +...;
-  Xd(13) = -(I22 - I11)*X(11)*X(12)/I33 +...;
+  LC = [...; ...; ...];
+  WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11)]
+  Xd(11:13,1) = LC*inv(ICB) - WX * ICB * X(11:13) * inv(ICB)
 
 end
