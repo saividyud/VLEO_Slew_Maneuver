@@ -32,13 +32,13 @@ function Xd = Sat_template(t,X)
     % Constants
     mu = 3.986e14;
     r = norm(X(1:3));
-    ICB = [I11 I12 I13; I21 I22 I23; I31 I32 I33];
+    ICB = [1 1 1; 1 1 1; 1 1 1];
     
     % 2BP(states 1:6)
     Xd(1:3) = X(4:6);
     
     % extra forces and perturbations can be added here
-    Xd(4:6) = -mu*X(1:3)/r^3 + F_J2 + ...;
+    Xd(4:6) = -mu*X(1:3)/r^3 + F_J2 
     
     % quaternion kinematics (states 7:10)
     B = [X(7) -X(8) -X(9) -X(10); x(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
@@ -46,7 +46,7 @@ function Xd = Sat_template(t,X)
     
     % Kinetics(states 11:13)
     % can add extra perturbations/Control inputs here 
-    LC = [...; ...; ...];
+    LC = [0; 0; 0];
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11)]
     Xd(11:13) = LC*inv(ICB) - WX * ICB * X(11:13) * inv(ICB)
 
