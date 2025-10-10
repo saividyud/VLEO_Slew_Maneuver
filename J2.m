@@ -1,4 +1,4 @@
-function [F_J23] = J2(X)
+function [a_J23] = J2(X)
 % J2 takes in the state vector of a satellite and outputs a force vector
 % due to the blateness and nonuniformity of the Earth.
 % 
@@ -9,8 +9,8 @@ function [F_J23] = J2(X)
 %
 % Returns
 % -------
-% F_J23 : 3x1 vector
-%   Perturbation force due to J2 effect and a higher order effect: J3
+% a_J23 : 3x1 vector
+%   Perturbation acceleration due to J2 effect and a higher order effect: J3
 
     % Defining constants
     mu = 3.986e14; % Gravitational parameter of Earth [m^3 / s^2]
@@ -41,22 +41,22 @@ function [F_J23] = J2(X)
         sin(phi)              , cos(phi)               , 0
     ];
     
-    % Defining J2 force in spherical frame
-    F_J2_coeff = -mu * R_e^2/r^4 * J2;
-    F_J2 = F_J2_coeff * [
+    % Defining J2 acceleration in spherical frame
+    a_J2_coeff = -mu * R_e^2/r^4 * J2;
+    a_J2 = a_J2_coeff * [
         3/4 * (3*cos(phi) - 1);
         3/2 * sin(2*phi);
         0
     ];
     
-    % Calculating the J3 force in spherical frame
-    F_J3_coeff = -mu * R_e^3/r^5 * J3;
-    F_J3 = F_J3_coeff * [
+    % Calculating the J3 acceleration in spherical frame
+    a_J3_coeff = -mu * R_e^3/r^5 * J3;
+    a_J3 = a_J3_coeff * [
         1/2 * (5*sin(3*phi));
         3/8 * (cos(phi) - 5*cos(3*phi));
         0
     ];
     
-    F_J23 = R_IS * (F_J2 + F_J3);
+    a_J23 = R_IS * (a_J2 + a_J3);
 
 end
