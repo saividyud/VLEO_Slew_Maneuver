@@ -5,3 +5,4 @@ Exploring the feasibility of using ion thrusters for slew maneuvers in Very Low 
 
 And this is David
 
+And this is Jonathan

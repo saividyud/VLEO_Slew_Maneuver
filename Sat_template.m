@@ -38,9 +38,9 @@ function Xd = Sat_template(t,X)
     Xd(1:3) = X(4:6);
     
     % extra forces and perturbations can be added here
-    Xd(4:6) = -mu*X(1:3)/r^3 + F_J2;
+    Xd(4:6) = -mu*X(1:3)/r^3 + F_J2;beta
     
-    % quaternion kinematics (states 7:10)
+    % quaternion kinematics (states 7:10) 
     B = [X(7) -X(8) -X(9) -X(10); x(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
     Xd(7:10) = .5*B*[0;X(11);X(12);X(13)];
     
