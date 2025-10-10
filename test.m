@@ -2,5 +2,28 @@ clear
 clc
 close all
 
-[t,y] = ode45(@Sat_template,[0.1000],[0,0,6678e3,-7750,0,0,0,0,0,0,0,0,0]');
-plot3(y(:,1),y(:,2),y(:,3),'o');
+%constants
+delt = 
+Xref = 
+Maxitr =
+eps = 
+
+% initial state
+X0 = 
+Xi = X0
+
+hold on
+for i = 1:Maxitr
+
+  %Controller block here
+  ui = f(err);
+  
+  [t,Xi] = ode45(@Sat_template,[0,delt],[Xi,ui];
+  plot3(Xi(:,1),Xi(:,2),Xi(:,3),'o');
+
+  %Sensor block here
+  Xhat = f(Xi);
+
+  %Calculate error
+  err = Xref - Xi;
+end
