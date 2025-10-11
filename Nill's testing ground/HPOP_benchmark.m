@@ -1,4 +1,6 @@
+%% 
 clear; clc; close all;
+global const Cnm Snm AuxParam eopdata swdata SOLdata DTCdata APdata PC
 
 fprintf('========================================\n');
 fprintf(' Three-Way Propagator Comparison\n');
@@ -87,14 +89,14 @@ fprintf('3. Running HPOP (high-precision numerical propagator)...\n');
 fprintf('   Configuration: 20x20 gravity, Sun/Moon, SRP, drag\n');
 
 % Convert epoch for HPOP
-if satdata.epochyr < 57
-    full_year = 2000 + satdata.epochyr;
+if satdata.year < 57
+    full_year = 2000 + satdata.year;
 else
-    full_year = 1900 + satdata.epochyr;
+    full_year = 1900 + satdata.year;
 end
 
 % Calculate Modified Julian Date
-Mjd0_UTC = Mjday(full_year, 1, 0) + satdata.epochdays;
+Mjd0_UTC = Mjday(full_year, 1, 0) + satdata.doy;
 
 % Initial state from SGP4 (already in meters and m/s)
 Y0_hpop = [r0_sgp4; v0_sgp4];

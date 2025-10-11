@@ -25,6 +25,8 @@ function [satdata] = parse_tle(line1, line2)
     % Parse TLE Line 1
     satdata.epochyr = str2double(line1(19:20));
     satdata.epochdays = str2double(line1(21:32));
+    satdata.year = str2num(line1(19:20));
+    satdata.doy = str2num(line1(21:32));
     satdata.ndot = str2double(line1(34:43));
     satdata.nddot = str2double(line1(45:50)) * 10^str2double(line1(51:52));
     bstar_val = str2double(line1(54:59));
