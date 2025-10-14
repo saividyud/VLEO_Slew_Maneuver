@@ -34,7 +34,7 @@ function Xd = Sat_template(t,X)
     r = norm(X(1:3));
 
     % Moment of inertia tensor
-    ICB = [1 1 1; 1 1 1; 1 1 1]; % [kg m^2]
+    ICB = [2/5*83*(.58/2)^2 0 0 ; 0 2/5*83*(.58/2)^2 0 ;0 0 2/5*83*(.58/2)^2]; % [kg m^2]
     
     % 2BP(states 1:6)
     Xd(1:3) = X(4:6);
@@ -43,13 +43,13 @@ function Xd = Sat_template(t,X)
     Xd(4:6) = -mu*X(1:3)/r^3 + a_J2;
     
     % quaternion kinematics (states 7:10) 
-    B = [X(7) -X(8) -X(9) -X(10); x(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
+    B = [X(7) -X(8) -X(9) -X(10); X(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
     Xd(7:10) = .5*B*[0;X(11);X(12);X(13)];
     
     % Kinetics(states 11:13)
     % can add extra perturbations/Control inputs here 
-    LC = [0; 0; 0];
+    LC = [.01; .01; .01];
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11) 0];
-    Xd(11:13) = LC*inv(ICB) - WX * ICB * X(11:13) * inv(ICB);
+    Xd(11:13) = inv(ICB)*(LC - WX* ICB * X(11:13));
 
 end
