@@ -27,4 +27,7 @@ for i = 1:Maxitr
 
   %Calculate error
   err = Xref - Xi;
+
+  % Might need to calculate Jacobian and linearize the dynamics, but dont 
+  % worry about it right now
 end

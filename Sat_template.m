@@ -35,6 +35,7 @@ function Xd = Sat_template(t,X)
 
     % Moment of inertia tensor
     ICB = [1 1 1; 1 1 1; 1 1 1]; % [kg m^2]
+    % Can start with approximating a sphere (think Sputnik)
     
     % 2BP(states 1:6)
     Xd(1:3) = X(4:6);
@@ -51,5 +52,10 @@ function Xd = Sat_template(t,X)
     LC = [0; 0; 0];
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11) 0];
     Xd(11:13) = LC*inv(ICB) - WX * ICB * X(11:13) * inv(ICB);
+    % Add a controlling term, which u = K*X(11:13), where K the gain (need
+    % to tune), can also add an integration term to reduce steady state
+    % error
+    
+    % Xdot = AX + Bu, B changes with the type of actuator we use
 
 end
