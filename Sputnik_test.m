@@ -4,7 +4,7 @@ clc; clear; close all;
 Xi = [0 0 6678e3 -7789 0 0 1 1 1 1 0 0 1]';
 
 %propogating orbit with ode15s
-[t,X] = ode15s(@Sat_template,[0,50000],Xi);
+[t,X] = ode15s(@Sat_template,[0, 50000],Xi);
 
 %plotting
 figure(1)
