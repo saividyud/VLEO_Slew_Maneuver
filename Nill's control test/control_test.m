@@ -85,7 +85,7 @@ fprintf('Orbital angular velocity: %.6f rad/s (period: %.2f min)\n', ...
         omega_orbit_mag, 2*pi/omega_orbit_mag/60);
 fprintf('Omega in ECI frame: [%.6f, %.6f, %.6f] rad/s\n', omega_eci(1), omega_eci(2), omega_eci(3));
 
-% Assemble initial state vector [r_eci; v_eci; q_eci_to_body; omega_eci]
+% Assemble initial state vector [r_eci; v_eci; q_body_to_eci; omega_eci]
 X0 = [r_eci; v_eci; q0; omega_eci];
 
 %% Simulation
