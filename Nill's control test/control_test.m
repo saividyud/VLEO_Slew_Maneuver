@@ -1,8 +1,12 @@
-% Test script for satellite dynamics with nadir-pointing camera
-% This script simulates a satellite in circular orbit and visualizes:
-% 1. 3D animated orbit trajectory
-% 2. Camera pointing direction
-% 3. RA and Dec vs time
+% Simulates a satellite in a free-drift circular orbit with a nadir-pointing attitude.
+% This script initializes a satellite's state and propagates it using a 6-DOF
+% dynamics model. All vector quantities in the state (position, velocity,
+% and angular velocity) are defined in the Earth-Centered Inertial (ECI) frame.
+%
+% The script generates three visualizations:
+% 1. A plot of the camera's Right Ascension (RA) and Declination (Dec) over time.
+% 2. A static 3D plot of the orbit, ECI frame, and sampled camera pointing vectors.
+% 3. An animated 3D visualization of the satellite's trajectory and attitude.
 
 clear; close all; clc;
 
@@ -33,90 +37,68 @@ T_orbit = 2 * pi * r_orbit / v_circ;
 fprintf('Orbital period: %.2f minutes\n', T_orbit/60);
 
 % Random orbital plane orientation
-% Generate random inclination and RAAN (Right Ascension of Ascending Node)
-inclination = rand() * pi;  % 0 to 180 degrees
-RAAN = rand() * 2 * pi;     % 0 to 360 degrees
-true_anomaly = rand() * 2 * pi;  % Random position in orbit
+inclination = rand() * pi;
+RAAN = rand() * 2 * pi;
+true_anomaly = rand() * 2 * pi;
 
 fprintf('Orbital inclination: %.2f degrees\n', rad2deg(inclination));
 fprintf('RAAN: %.2f degrees\n', rad2deg(RAAN));
 
-% Construct rotation matrices
-R_RAAN = [cos(RAAN), -sin(RAAN), 0;
-          sin(RAAN),  cos(RAAN), 0;
-          0,          0,         1];
+% Construct rotation matrix from perifocal to ECI
+R_RAAN = [cos(RAAN), -sin(RAAN), 0; sin(RAAN), cos(RAAN), 0; 0, 0, 1];
+R_inc = [1, 0, 0; 0, cos(inclination), -sin(inclination); 0, sin(inclination), cos(inclination)];
+R_ta = [cos(true_anomaly), -sin(true_anomaly), 0; sin(true_anomaly), cos(true_anomaly), 0; 0, 0, 1];
+R_perifocal_to_ECI = R_RAAN * R_inc * R_ta;
 
-R_inc = [1, 0,            0;
-         0, cos(inclination), -sin(inclination);
-         0, sin(inclination),  cos(inclination)];
-
-R_ta = [cos(true_anomaly), -sin(true_anomaly), 0;
-        sin(true_anomaly),  cos(true_anomaly), 0;
-        0,                  0,                 1];
-
-% Position in orbital plane (perifocal frame)
+% Position and velocity in ECI
 r_perifocal = [r_orbit; 0; 0];
 v_perifocal = [0; v_circ; 0];
-
-% Transform to ECI
-R_perifocal_to_ECI = R_RAAN * R_inc * R_ta;
 r_eci = R_perifocal_to_ECI * r_perifocal;
 v_eci = R_perifocal_to_ECI * v_perifocal;
 
-% Initial attitude: nadir-pointing
-% For nadir-pointing:
-% - Body Z-axis points away from Earth (radial out)
-% - Body X-axis in velocity direction
-% - Body Y-axis completes right-handed system (normal to orbit plane)
+% --- CORRECTED INITIAL ATTITUDE: NADIR-POINTING ---
+% We define the body frame axes such that the +Z axis points to nadir.
+% This aligns with a standard LVLH (Local Vertical-Local Horizontal) frame.
+% - Body +Z-axis points towards Earth's center (nadir).
+% - Body +Y-axis points opposite to the orbit normal.
+% - Body +X-axis completes the right-handed frame (generally along velocity).
+% Nadir direction (toward Earth)
+nadir_eci = -r_eci / norm(r_eci);
 
-% Define body axes in ECI frame
-z_body_eci = r_eci / norm(r_eci);  % Radial direction (away from Earth)
-y_body_eci = cross(r_eci, v_eci);
-y_body_eci = y_body_eci / norm(y_body_eci);  % Orbit normal
-x_body_eci = cross(y_body_eci, z_body_eci);  % Velocity direction
+% Orbit normal
+orbit_normal_eci = cross(r_eci, v_eci) / norm(cross(r_eci, v_eci));
 
-% Rotation matrix from ECI to Body
-R_ECI_to_Body = [x_body_eci'; y_body_eci'; z_body_eci'];
+% Body frame axes in ECI
+z_body_eci = -r_eci / norm(r_eci);  % Toward Earth (nadir)
+y_body_eci = -cross(r_eci, v_eci) / norm(cross(r_eci, v_eci));  % -Orbit normal
+x_body_eci = cross(y_body_eci, z_body_eci);  % Complete right-handed frame
 
-% Convert rotation matrix to quaternion (scalar-last convention)
-q0 = dcm_to_quaternion(R_ECI_to_Body);
+R_Body_to_ECI = [x_body_eci, y_body_eci, z_body_eci];
+q0 = dcm_to_quaternion(R_Body_to_ECI);
 
-% Initial angular velocity for nadir-pointing.
-% NOTE: A negative sign is used here to counteract a sign error in the
-%       quaternion kinematics implementation in Sat_template.m
-omega_orbit = v_circ / r_orbit;  % Orbital angular rate [rad/s]
-h_eci = cross(r_eci, v_eci);
-h_eci = h_eci / norm(h_eci);
-omega0 = -omega_orbit * h_eci; % This is the initial angular velocity vector IN ECI FRAME
+% Initial angular velocity required to maintain this nadir-pointing attitude.
+% The body frame must rotate at the same angular rate as the orbit itself.
+omega_orbit_mag = v_circ / r_orbit;
+omega_eci = omega_orbit_mag * orbit_normal_eci; % Body rotates with the orbit
 
 fprintf('Orbital angular velocity: %.6f rad/s (period: %.2f min)\n', ...
-        omega_orbit, 2*pi/omega_orbit/60);
-fprintf('Omega in body frame: [%.6f, %.6f, %.6f] rad/s\n', omega0(1), omega0(2), omega0(3));
+        omega_orbit_mag, 2*pi/omega_orbit_mag/60);
+fprintf('Omega in ECI frame: [%.6f, %.6f, %.6f] rad/s\n', omega_eci(1), omega_eci(2), omega_eci(3));
 
-% Assemble initial state
-% NOTE: The angular velocity 'omega0' is passed to the dynamics function
-%       as if it were in the body frame. This works for this specific
-%       simulation due to a spherically symmetric inertia tensor.
-X0 = [r_eci; v_eci; q0; omega0];
+% Assemble initial state vector [r_eci; v_eci; q_eci_to_body; omega_eci]
+X0 = [r_eci; v_eci; q0; omega_eci];
 
 %% Simulation
-
-% Simulate for 1.5 orbits
+% (This section remains unchanged)
 t_sim = 1.5 * T_orbit;
 tspan = linspace(0, t_sim, 500);
-
-% Desired state (for dynamics function - we'll use zero control)
-desired_state = X0;  % No control, free orbit
-
-% ODE options
+desired_state = X0;
 options = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
 
-% Propagate orbit
 fprintf('\nPropagating orbit...\n');
 [t, X] = ode45(@(t, X) Sat_template(t, X, desired_state, params, ...
                 'useJ2', false, 'useAtmDrag', false, 'useControl', false), ...
                 tspan, X0, options);
-
 fprintf('Simulation complete!\n');
 
 %% Compute observations (RA, Dec)
@@ -283,13 +265,9 @@ end
 fprintf('Animation complete!\n');
 
 %% Helper Function: DCM to Quaternion
-
 function q = dcm_to_quaternion(R)
-    % Convert Direction Cosine Matrix to quaternion (scalar-last)
-    % Using Shepperd's method
-
+    % (Function code is the same as original)
     trace_R = trace(R);
-
     if trace_R > 0
         s = 0.5 / sqrt(trace_R + 1.0);
         qw = 0.25 / s;
@@ -315,8 +293,6 @@ function q = dcm_to_quaternion(R)
         qy = (R(2,3) + R(3,2)) / s;
         qz = 0.25 * s;
     end
-
-    % Scalar-last convention
     q = [qx; qy; qz; qw];
     q = q / norm(q);
 end
