@@ -1,298 +1,286 @@
-% Simulates a satellite in a free-drift circular orbit with a nadir-pointing attitude.
-% This script initializes a satellite's state and propagates it using a 6-DOF
-% dynamics model. All vector quantities in the state (position, velocity,
-% and angular velocity) are defined in the Earth-Centered Inertial (ECI) frame.
-%
-% The script generates three visualizations:
-% 1. A plot of the camera's Right Ascension (RA) and Declination (Dec) over time.
-% 2. A static 3D plot of the orbit, ECI frame, and sampled camera pointing vectors.
-% 3. An animated 3D visualization of the satellite's trajectory and attitude.
+% Modified Supernova Slew Maneuver with Smooth Proportional Control and 3D Animation
+% Mission: Point to supernova in 5 minutes, observe behavior for 6 minutes total
 
 clear; close all; clc;
 
-%% Parameters
-params.mu = 3.986004418e14;     % Earth gravitational parameter [m^3/s^2]
-params.R_e = 6378137;           % Earth radius [m]
-params.mass = 500;              % Satellite mass [kg]
-params.J2 = 1.08263e-3;         % J2 coefficient
-params.I_CB = params.mass * eye(3); % Symmetric moment of inertia [kg*m^2]
+% Parameters
+params.mu = 3.986004418e14; % Earth gravitational parameter [m^3/s^2]
+params.R_e = 6378137; % Earth radius [m]
+params.mass = 83.6; % Satellite mass [kg]
+params.radius = 0.58/2; % Satellite radius [m] (for thrust calculation)
+params.J2 = 1.08263e-3; % J2 coefficient
+params.I_CB = 2/5 * params.mass * params.radius^2 * eye(3); % Moment of inertia [kg*m^2]
 
-% Control gains (not used for free orbit, but needed for function)
-params.Kp_pos = 0;
-params.Kd_pos = 0;
-params.Kp_att = 0;
-params.Kd_att = 0;
+% Proportional control gain
+params.Kp_att = 0.5; % [N*m]
 
-%% Initial Conditions
-
-% Altitude
-altitude = 200e3;  % 200 km
+% Initial Conditions
+altitude = 200e3; % 200 km
 r_orbit = params.R_e + altitude;
-
-% Circular orbit velocity
 v_circ = sqrt(params.mu / r_orbit);
 
-% Orbital period
-T_orbit = 2 * pi * r_orbit / v_circ;
-fprintf('Orbital period: %.2f minutes\n', T_orbit/60);
-
-% Random orbital plane orientation
+% Orbital plane random orientation
 inclination = rand() * pi;
 RAAN = rand() * 2 * pi;
 true_anomaly = rand() * 2 * pi;
-
-fprintf('Orbital inclination: %.2f degrees\n', rad2deg(inclination));
-fprintf('RAAN: %.2f degrees\n', rad2deg(RAAN));
-
-% Construct rotation matrix from perifocal to ECI
 R_RAAN = [cos(RAAN), -sin(RAAN), 0; sin(RAAN), cos(RAAN), 0; 0, 0, 1];
 R_inc = [1, 0, 0; 0, cos(inclination), -sin(inclination); 0, sin(inclination), cos(inclination)];
 R_ta = [cos(true_anomaly), -sin(true_anomaly), 0; sin(true_anomaly), cos(true_anomaly), 0; 0, 0, 1];
 R_perifocal_to_ECI = R_RAAN * R_inc * R_ta;
-
-% Position and velocity in ECI
 r_perifocal = [r_orbit; 0; 0];
 v_perifocal = [0; v_circ; 0];
 r_eci = R_perifocal_to_ECI * r_perifocal;
 v_eci = R_perifocal_to_ECI * v_perifocal;
 
-% --- CORRECTED INITIAL ATTITUDE: NADIR-POINTING ---
-% We define the body frame axes such that the +Z axis points to nadir.
-% This aligns with a standard LVLH (Local Vertical-Local Horizontal) frame.
-% - Body +Z-axis points towards Earth's center (nadir).
-% - Body +Y-axis points opposite to the orbit normal.
-% - Body +X-axis completes the right-handed frame (generally along velocity).
-% Nadir direction (toward Earth)
-nadir_eci = -r_eci / norm(r_eci);
-
-% Orbit normal
+% Initial attitude - nadir pointing basis
 orbit_normal_eci = cross(r_eci, v_eci) / norm(cross(r_eci, v_eci));
-
-% Body frame axes in ECI
-z_body_eci = -r_eci / norm(r_eci);  % Toward Earth (nadir)
-y_body_eci = -cross(r_eci, v_eci) / norm(cross(r_eci, v_eci));  % -Orbit normal
-x_body_eci = cross(y_body_eci, z_body_eci);  % Complete right-handed frame
-
+z_body_eci = -r_eci / norm(r_eci);
+x_body_eci = v_eci / norm(v_eci);
+y_body_eci = cross(z_body_eci, x_body_eci);
 R_Body_to_ECI = [x_body_eci, y_body_eci, z_body_eci];
 q0 = dcm_to_quaternion(R_Body_to_ECI);
-
-% Initial angular velocity required to maintain this nadir-pointing attitude.
-% The body frame must rotate at the same angular rate as the orbit itself.
 omega_orbit_mag = v_circ / r_orbit;
-omega_eci = omega_orbit_mag * orbit_normal_eci; % Body rotates with the orbit
-
-fprintf('Orbital angular velocity: %.6f rad/s (period: %.2f min)\n', ...
-        omega_orbit_mag, 2*pi/omega_orbit_mag/60);
-fprintf('Omega in ECI frame: [%.6f, %.6f, %.6f] rad/s\n', omega_eci(1), omega_eci(2), omega_eci(3));
-
-% Assemble initial state vector [r_eci; v_eci; q_body_to_eci; omega_eci]
+omega_eci = omega_orbit_mag * orbit_normal_eci;
 X0 = [r_eci; v_eci; q0; omega_eci];
 
-%% Simulation
-% (This section remains unchanged)
-t_sim = 1.5 * T_orbit;
-tspan = linspace(0, t_sim, 500);
-desired_state = X0;
-options = odeset('RelTol', 1e-8, 'AbsTol', 1e-10);
+% Supernova event
+supernova_ra = rand() * 360; % RA degrees
+supernova_dec = (rand() - 0.5) * 180; % Dec degrees
+ra_rad = deg2rad(supernova_ra);
+dec_rad = deg2rad(supernova_dec);
+actual_target = [cos(dec_rad)*cos(ra_rad); cos(dec_rad)*sin(ra_rad); sin(dec_rad)];
+actual_target = actual_target / norm(actual_target);
 
-fprintf('\nPropagating orbit...\n');
-[t, X] = ode45(@(t, X) Sat_template(t, X, desired_state, params, ...
-                'useJ2', false, 'useAtmDrag', false, 'useControl', false), ...
-                tspan, X0, options);
-fprintf('Simulation complete!\n');
+% Original pointing vector (at t=0) - camera aligned +Z body axis
+original_point_vec = R_Body_to_ECI(:,3); % +Z in ECI
 
-%% Compute observations (RA, Dec)
+fprintf('=== SUPERNOVA SLEW MANEUVER ===\n');
+fprintf('Supernova Location: RA=%.2f deg, Dec=%.2f deg\n', supernova_ra, supernova_dec);
+fprintf('Mission: Reach target in 5 minutes\n');
+fprintf('Simulation: Run for 6 minutes to observe behavior\n\n');
 
-n_points = length(t);
-ra = zeros(n_points, 1);
-dec = zeros(n_points, 1);
-pointing_vectors = zeros(n_points, 3);
-
-for i = 1:n_points
-    obs = state_to_observation(X(i, :)', params);
-    ra(i) = obs.ra;
-    dec(i) = obs.dec;
-    pointing_vectors(i, :) = obs.pointing_eci';
+total_angle = acos(max(min(dot(original_point_vec, actual_target), 1), -1));
+rotation_axis = cross(original_point_vec, actual_target);
+if norm(rotation_axis) < 1e-6
+    rotation_axis = [0; 0; 1];
+else
+    rotation_axis = rotation_axis / norm(rotation_axis);
 end
 
-%% Plot 1: RA and Dec vs Time
+% Timing parameters
+maneuver_time = 5 * 60; % 5 minutes to reach target
+total_sim_time = 6 * 60; % 6 minutes total observation
+sim_time = 20; % 20 seconds wall-clock time
+speedup_factor = total_sim_time / sim_time;
 
-figure('Position', [100, 100, 1200, 500]);
+dt = 0.1;
+tspan = 0:dt:sim_time;
+n_steps = length(tspan);
 
-subplot(2, 1, 1);
-plot(t/60, ra, 'b-', 'LineWidth', 1.5);
-xlabel('Time [minutes]');
-ylabel('Right Ascension [degrees]');
-title('Camera Right Ascension vs Time');
-grid on;
-ylim([0 360]);
+X_history = zeros(n_steps, 13);
+pointing_error_history = zeros(n_steps, 1);
+tau_history = zeros(n_steps, 3);
+thrust_history = zeros(n_steps, 3);
+omega_mag_history = zeros(n_steps, 1);
+alpha_mag_history = zeros(n_steps, 1);
+desired_point_history = zeros(n_steps, 3);
 
-subplot(2, 1, 2);
-plot(t/60, dec, 'r-', 'LineWidth', 1.5);
-xlabel('Time [minutes]');
-ylabel('Declination [degrees]');
-title('Camera Declination vs Time');
-grid on;
-ylim([-90 90]);
+X_history(1,:) = X0';
+event_acquired = false;
+t_acquired = NaN;
 
-%% Plot 2: 3D Orbit Visualization (Static)
+fprintf('Starting controlled slew with smooth target trajectory...\n');
 
-figure('Position', [100, 100, 800, 800]);
+for i = 2:n_steps
+    t_real = tspan(i) * speedup_factor; % Real mission time
 
-% Extract positions
-pos = X(:, 1:3) / 1e3;  % Convert to km
+    % Desired pointing vector based on 5-minute maneuver time
+    if t_real < maneuver_time
+        alpha = t_real / maneuver_time;
+    else
+        alpha = 1; % After 5 minutes, stay at target
+    end
+    desired_point_vec = (1-alpha)*original_point_vec + alpha*actual_target;
+    desired_point_vec = desired_point_vec / norm(desired_point_vec);
+    desired_point_history(i, :) = desired_point_vec';
 
-% Plot Earth
-[x_earth, y_earth, z_earth] = sphere(50);
-x_earth = x_earth * params.R_e / 1e3;
-y_earth = y_earth * params.R_e / 1e3;
-z_earth = z_earth * params.R_e / 1e3;
+    % Propagate one step with desired pointing
+    [~, X_seg] = ode45(@(t,X) Sat_template(t, X, desired_point_vec, params, ...
+        'useJ2', false, 'useAtmDrag', false, 'useControl', true), ...
+        [tspan(i-1), tspan(i)], X_history(i-1,:)', ...
+        odeset('RelTol',1e-8, 'AbsTol',1e-10));
+    X_history(i,:) = X_seg(end,:);
 
-surf(x_earth, y_earth, z_earth, 'FaceColor', 'cyan', 'FaceAlpha', 0.3, ...
-     'EdgeColor', 'none');
-hold on;
+    % Compute pointing error to actual target
+    obs = state_to_observation(X_history(i,:)', params);
+    current_pointing_eci = obs.pointing_eci;
+    dot_prod = dot(current_pointing_eci, actual_target);
+    dot_prod = min(max(dot_prod, -1), 1); % Clamp
+    pointing_error_deg = rad2deg(acos(dot_prod));
+    pointing_error_history(i) = pointing_error_deg;
 
-% Plot orbit
-plot3(pos(:, 1), pos(:, 2), pos(:, 3), 'b-', 'LineWidth', 2);
+    % Torque logging
+    q = X_history(i, 7:10)';
+    q = q / norm(q);
+    R_Body_to_ECI = quaternion_to_dcm(q);
+    R_ECI_to_Body = R_Body_to_ECI';
+    pointing_error_eci = cross(current_pointing_eci, desired_point_vec);
+    pointing_error_body = R_ECI_to_Body * pointing_error_eci;
+    tau_body = params.Kp_att * pointing_error_body;
+    tau_eci = R_Body_to_ECI * tau_body;
+    tau_history(i, :) = tau_eci';
 
-% Plot ECI axes
-axis_length = params.R_e / 1e3 * 1.5;
-quiver3(0, 0, 0, axis_length, 0, 0, 'r', 'LineWidth', 2, 'MaxHeadSize', 0.5);
-quiver3(0, 0, 0, 0, axis_length, 0, 'g', 'LineWidth', 2, 'MaxHeadSize', 0.5);
-quiver3(0, 0, 0, 0, 0, axis_length, 'b', 'LineWidth', 2, 'MaxHeadSize', 0.5);
-text(axis_length*1.1, 0, 0, 'X (Vernal Equinox)', 'Color', 'r', 'FontSize', 12);
-text(0, axis_length*1.1, 0, 'Y', 'Color', 'g', 'FontSize', 12);
-text(0, 0, axis_length*1.1, 'Z (North Pole)', 'Color', 'b', 'FontSize', 12);
+    % Thrust logging
+    thrust_history(i, :) = tau_eci' / (2 * params.radius);
 
-% Plot initial and final positions
-plot3(pos(1, 1), pos(1, 2), pos(1, 3), 'go', 'MarkerSize', 10, ...
-      'MarkerFaceColor', 'g');
-plot3(pos(end, 1), pos(end, 2), pos(end, 3), 'ro', 'MarkerSize', 10, ...
-      'MarkerFaceColor', 'r');
+    omega_eci = X_history(i, 11:13)';
+    omega_mag_history(i) = norm(omega_eci);
 
-% Plot some camera pointing vectors
-sample_indices = round(linspace(1, n_points, 20));
-scale = 2000;  % km
-for i = sample_indices
-    p = pos(i, :);
-    v = pointing_vectors(i, :) * scale;
-    quiver3(p(1), p(2), p(3), v(1), v(2), v(3), 'm', 'LineWidth', 1.5, ...
-            'MaxHeadSize', 1);
+    % Angular acceleration approx
+    if i > 2
+        alpha_eci = (X_history(i, 11:13) - X_history(i-1, 11:13)) / dt;
+        alpha_mag_history(i) = norm(alpha_eci);
+    end
+
+    % Acquisition check (only report once)
+    if pointing_error_deg < 0.5 && ~event_acquired
+        event_acquired = true;
+        t_acquired = tspan(i);
+        fprintf('*** TARGET ACQUIRED at t=%.2f s (real time %.2f min) ***\n', ...
+            t_acquired, t_real / 60);
+        fprintf('Pointing error: %.4f degrees\n\n', pointing_error_deg);
+    end
 end
 
-xlabel('X [km]');
-ylabel('Y [km]');
-zlabel('Z [km]');
-title('Satellite Orbit with Camera Pointing Vectors');
-legend('Earth', 'Orbit', 'X-axis', 'Y-axis', 'Z-axis', 'Start', 'End', ...
-       'Camera Direction', 'Location', 'best');
-axis equal;
-grid on;
-view(45, 30);
+% Store initial desired pointing
+desired_point_history(1, :) = original_point_vec';
 
-%% Plot 3: Animated 3D Orbit
+if ~event_acquired
+    fprintf('*** MISSION FAILED to acquire target within 6 minutes ***\n');
+    fprintf('Final pointing error: %.4f degrees\n\n', pointing_error_history(end));
+end
 
-figure('Position', [100, 100, 800, 800]);
+% === 3D Animated Plot ===
+fprintf('Generating 3D animated plot...\n');
 
-% Initialize plot
-[x_earth, y_earth, z_earth] = sphere(50);
-x_earth = x_earth * params.R_e / 1e3;
-y_earth = y_earth * params.R_e / 1e3;
-z_earth = z_earth * params.R_e / 1e3;
+figure('Name', '3D Attitude Visualization', 'Position', [100 100 1200 800]);
 
-h_earth = surf(x_earth, y_earth, z_earth, 'FaceColor', 'cyan', ...
-               'FaceAlpha', 0.3, 'EdgeColor', 'none');
-hold on;
+[xs, ys, zs] = sphere(50);
 
-% ECI axes
-axis_length = params.R_e / 1e3 * 1.5;
-quiver3(0, 0, 0, axis_length, 0, 0, 'r', 'LineWidth', 2, 'MaxHeadSize', 0.5);
-quiver3(0, 0, 0, 0, axis_length, 0, 'g', 'LineWidth', 2, 'MaxHeadSize', 0.5);
-quiver3(0, 0, 0, 0, 0, axis_length, 'b', 'LineWidth', 2, 'MaxHeadSize', 0.5);
+n_frames = length(tspan);
+frame_skip = max(1, floor(n_frames / 100));
 
-% Orbit trail
-h_trail = plot3(pos(1, 1), pos(1, 2), pos(1, 3), 'b-', 'LineWidth', 1.5);
+for i = 1:frame_skip:n_frames
+    clf;
+    surf(xs, ys, zs, 'FaceAlpha', 0.1, 'EdgeColor', 'none', 'FaceColor', [0.8 0.8 0.8]);
+    hold on;
+    axis equal;
+    grid on;
+    xlabel('X (ECI)'); ylabel('Y (ECI)'); zlabel('Z (ECI)');
+    t_real = tspan(i) * speedup_factor;
+    title(sprintf('Satellite Attitude Control - Time: %.2f s (Real: %.2f min)', ...
+        tspan(i), t_real/60));
 
-% Satellite position
-h_sat = plot3(pos(1, 1), pos(1, 2), pos(1, 3), 'ro', 'MarkerSize', 12, ...
-              'MarkerFaceColor', 'r');
+    % Current pointing vector (blue)
+    obs = state_to_observation(X_history(i,:)', params);
+    current_pointing = obs.pointing_eci;
+    quiver3(0, 0, 0, current_pointing(1), current_pointing(2), current_pointing(3), ...
+        1.2, 'b', 'LineWidth', 3, 'MaxHeadSize', 0.5);
 
-% Camera pointing vector
-scale = 2000;  % km
-v_init = pointing_vectors(1, :) * scale;
-h_camera = quiver3(pos(1, 1), pos(1, 2), pos(1, 3), ...
-                   v_init(1), v_init(2), v_init(3), ...
-                   'm', 'LineWidth', 2, 'MaxHeadSize', 1);
+    % Actual target pointing vector (red)
+    quiver3(0, 0, 0, actual_target(1), actual_target(2), actual_target(3), ...
+        1.2, 'r', 'LineWidth', 3, 'MaxHeadSize', 0.5);
 
-xlabel('X [km]');
-ylabel('Y [km]');
-zlabel('Z [km]');
-title('Animated Satellite Orbit - Camera Nadir Pointing');
-axis equal;
-grid on;
-view(45, 30);
-xlim([-1.2*r_orbit/1e3, 1.2*r_orbit/1e3]);
-ylim([-1.2*r_orbit/1e3, 1.2*r_orbit/1e3]);
-zlim([-1.2*r_orbit/1e3, 1.2*r_orbit/1e3]);
+    % Desired pointing vector (yellow/gold) - time-varying
+    desired_point_vec = desired_point_history(i, :)';
+    quiver3(0, 0, 0, desired_point_vec(1), desired_point_vec(2), desired_point_vec(3), ...
+        1.2, 'Color', [1 0.6 0], 'LineWidth', 3, 'MaxHeadSize', 0.5);
 
-% Animation
-fprintf('\nAnimating orbit (this may take a moment)...\n');
-skip = 5;  % Show every 5th point for smoother animation
-for i = 1:skip:n_points
-    % Update trail
-    set(h_trail, 'XData', pos(1:i, 1), 'YData', pos(1:i, 2), 'ZData', pos(1:i, 3));
+    % Angular velocity vector (green) - normalized
+    omega_eci = X_history(i, 11:13)';
+    if norm(omega_eci) > 1e-6
+        omega_unit = omega_eci / norm(omega_eci);
+        quiver3(0, 0, 0, omega_unit(1), omega_unit(2), omega_unit(3), ...
+            1.0, 'g', 'LineWidth', 2, 'MaxHeadSize', 0.5);
+    end
 
-    % Update satellite position
-    set(h_sat, 'XData', pos(i, 1), 'YData', pos(i, 2), 'ZData', pos(i, 3));
+    % Angular acceleration vector (magenta) - normalized
+    if i > 1
+        alpha_eci = (X_history(i, 11:13) - X_history(i-1, 11:13)) / dt;
+        if norm(alpha_eci) > 1e-6
+            alpha_unit = alpha_eci / norm(alpha_eci);
+            quiver3(0, 0, 0, alpha_unit(1), alpha_unit(2), alpha_unit(3), ...
+                0.9, 'm', 'LineWidth', 2, 'MaxHeadSize', 0.5);
+        end
+    end
 
-    % Update camera vector
-    p = pos(i, :);
-    v = pointing_vectors(i, :) * scale;
+    % Control torque vector (cyan) - normalized
+    tau_eci = tau_history(i, :)';
+    if norm(tau_eci) > 1e-6
+        tau_unit = tau_eci / norm(tau_eci);
+        quiver3(0, 0, 0, tau_unit(1), tau_unit(2), tau_unit(3), ...
+            0.8, 'c', 'LineWidth', 2, 'MaxHeadSize', 0.5);
+    end
 
-    % Delete old quiver and create new one (quiver set doesn't work well)
-    delete(h_camera);
-    h_camera = quiver3(p(1), p(2), p(3), v(1), v(2), v(3), ...
-                       'm', 'LineWidth', 2, 'MaxHeadSize', 1);
+    legend('Unit Sphere', 'Current Pointing', 'Target Pointing (Final)', ...
+        'Desired Pointing (Traj)', 'Angular Velocity', 'Angular Acceleration', ...
+        'Control Torque', 'Location', 'best');
 
-    % Update title with time and RA/Dec
-    title(sprintf('Time: %.1f min | RA: %.1f° | Dec: %.1f°', ...
-                  t(i)/60, ra(i), dec(i)));
+    view(45, 30);
+    xlim([-1.5 1.5]); ylim([-1.5 1.5]); zlim([-1.5 1.5]);
 
     drawnow;
-    pause(0.01);
+    pause(0.05);
 end
 
-fprintf('Animation complete!\n');
+% === Pointing Error Plot ===
+figure('Name', 'Pointing Error');
+plot(tspan * speedup_factor / 60, pointing_error_history, 'b-', 'LineWidth', 2);
+hold on;
+yline(0.5, 'r--', 'LineWidth', 1.5, 'Label', 'FOV Tolerance (0.5°)');
+xline(5, 'k--', 'LineWidth', 1.5, 'Label', '5 min (Target Time)');
+xlabel('Real Time (minutes)');
+ylabel('Pointing Error (degrees)');
+title('Pointing Error to Final Target Over Time');
+grid on;
+xlim([0, 6]);
 
-%% Helper Function: DCM to Quaternion
-function q = dcm_to_quaternion(R)
-    % (Function code is the same as original)
-    trace_R = trace(R);
-    if trace_R > 0
-        s = 0.5 / sqrt(trace_R + 1.0);
-        qw = 0.25 / s;
-        qx = (R(3,2) - R(2,3)) * s;
-        qy = (R(1,3) - R(3,1)) * s;
-        qz = (R(2,1) - R(1,2)) * s;
-    elseif (R(1,1) > R(2,2)) && (R(1,1) > R(3,3))
-        s = 2.0 * sqrt(1.0 + R(1,1) - R(2,2) - R(3,3));
-        qw = (R(3,2) - R(2,3)) / s;
-        qx = 0.25 * s;
-        qy = (R(1,2) + R(2,1)) / s;
-        qz = (R(1,3) + R(3,1)) / s;
-    elseif R(2,2) > R(3,3)
-        s = 2.0 * sqrt(1.0 + R(2,2) - R(1,1) - R(3,3));
-        qw = (R(1,3) - R(3,1)) / s;
-        qx = (R(1,2) + R(2,1)) / s;
-        qy = 0.25 * s;
-        qz = (R(2,3) + R(3,2)) / s;
-    else
-        s = 2.0 * sqrt(1.0 + R(3,3) - R(1,1) - R(2,2));
-        qw = (R(2,1) - R(1,2)) / s;
-        qx = (R(1,3) + R(3,1)) / s;
-        qy = (R(2,3) + R(3,2)) / s;
-        qz = 0.25 * s;
-    end
-    q = [qx; qy; qz; qw];
-    q = q / norm(q);
+% === Torque / Thrust Plot ===
+figure('Name', 'Control Effort', 'Position', [100 100 1200 800]);
+
+subplot(2, 1, 1);
+time_min = tspan * speedup_factor / 60;
+plot(time_min, tau_history(:, 1), 'r-', 'LineWidth', 1.5); hold on;
+plot(time_min, tau_history(:, 2), 'g-', 'LineWidth', 1.5);
+plot(time_min, tau_history(:, 3), 'b-', 'LineWidth', 1.5);
+plot(time_min, vecnorm(tau_history, 2, 2), 'k--', 'LineWidth', 2);
+xline(5, 'k--', 'LineWidth', 1, 'Label', '5 min');
+xlabel('Real Time (minutes)'); 
+ylabel('Torque (N·m)');
+title('Control Torque vs Time');
+legend('\tau_x', '\tau_y', '\tau_z', '||\tau||', 'Location', 'best');
+grid on;
+xlim([0, 6]);
+
+subplot(2, 1, 2);
+plot(time_min, thrust_history(:, 1), 'r-', 'LineWidth', 1.5); hold on;
+plot(time_min, thrust_history(:, 2), 'g-', 'LineWidth', 1.5);
+plot(time_min, thrust_history(:, 3), 'b-', 'LineWidth', 1.5);
+plot(time_min, vecnorm(thrust_history, 2, 2), 'k--', 'LineWidth', 2);
+xline(5, 'k--', 'LineWidth', 1, 'Label', '5 min');
+xlabel('Real Time (minutes)'); 
+ylabel('Thrust (N)');
+title('Control Thrust vs Time (Thrust = Torque / (2×radius))');
+legend('F_x', 'F_y', 'F_z', '||F||', 'Location', 'best');
+grid on;
+xlim([0, 6]);
+
+fprintf('\nSimulation complete!\n');
+
+% === Helper Functions ===
+function R = quaternion_to_dcm(q)
+    qx = q(1); qy = q(2); qz = q(3); qw = q(4);
+    R = [1-2*(qy^2+qz^2), 2*(qx*qy-qw*qz), 2*(qx*qz+qw*qy); 
+         2*(qx*qy+qw*qz), 1-2*(qx^2+qz^2), 2*(qy*qz-qw*qx); 
+         2*(qx*qz-qw*qy), 2*(qy*qz+qw*qx), 1-2*(qx^2+qy^2)];
 end
