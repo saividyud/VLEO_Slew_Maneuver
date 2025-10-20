@@ -59,6 +59,7 @@ try
     x_traj = y(1:3, :) * L_scale;
     v_traj = y(4:6, :) * V_scale;
     lambda_x = y(7:9, :);
+    lambda_v = y(10:12, :);
     
     % Compute optimal acceleration
     a_traj = zeros(3, length(t));
@@ -69,12 +70,19 @@ try
         end
     end
     
+    % Compute acceleration magnitude
+    a_mag = vecnorm(a_traj);
+    
     fprintf('Minimum time: %.4f seconds\n', tf);
     fprintf('Initial position: [%.2f, %.2f, %.2f]\n', x0);
     fprintf('Final position: [%.2f, %.2f, %.2f]\n', x_traj(:,end));
     fprintf('Position error: %.6f\n', norm(x_traj(:,end) - x1));
     fprintf('Velocity error: %.6f\n', norm(v_traj(:,end) - v1));
-    fprintf('Acceleration magnitude (max): %.4f\n', max(vecnorm(a_traj)));
+    fprintf('Acceleration magnitude (max): %.4f m/s^2\n', max(a_mag));
+    fprintf('Acceleration magnitude (mean): %.4f m/s^2\n', mean(a_mag));
+    
+    % Plot acceleration magnitude and lambda_r
+    plot_analysis(t, a_traj, a_mag, lambda_x, lambda_v, amax);
     
     % Animate trajectory with initial velocities passed
     animate_trajectory(t, x_traj, v_traj, a_traj, x0, x1, v0, amax);
@@ -87,16 +95,18 @@ end
 %% Helper Functions
 
 function dydt = ode_sys(tau, y, amax_s)
-    % State: y = [x(1:3); v(4:6); lambda_x(7:9); lambda_v(10:12); tf(13)]
+    % State: y = [x(1:3); v(4:6); lambda_r(7:9); lambda_v(10:12); tf(13)]
     v = y(4:6);
-    lambda_x = y(7:9);
+    lambda_r = y(7:9);  % Changed name for clarity
     lambda_v = y(10:12);
     tf = y(13);
     
     % Optimal control (bang-bang)
-    lambda_norm = norm(lambda_x);
-    if lambda_norm > 1e-10
-        a = -amax_s * lambda_x / lambda_norm;
+    % Note: We use lambda_r (not lambda_v!) for control direction
+    lambda_r_norm = norm(lambda_r);
+    lambda_v_norm = norm(lambda_v);
+    if lambda_r_norm > 1e-10
+        a = amax_s * lambda_v / lambda_v_norm;
     else
         a = [0; 0; 0];
     end
@@ -105,41 +115,43 @@ function dydt = ode_sys(tau, y, amax_s)
     dxdt = v;
     dvdt = a;
     
-    % Costate equations: dlambda/dtau = -tf * dH/dx
-    dlambda_xdt = -lambda_v;  % -dH/dx
-    dlambda_vdt = -lambda_x;  % -dH/dv
+    % Costate equations (CORRECTED!)
+    dlambda_rdt = zeros(3,1);  % lambda_r is constant!
+    dlambda_vdt = -lambda_r;   % lambda_v evolves linearly
     
     % Final time is constant
     dtfdt = 0;
     
-    dydt = tf * [dxdt; dvdt; dlambda_xdt; dlambda_vdt; dtfdt];
+    dydt = tf * [dxdt; dvdt; dlambda_rdt; dlambda_vdt; dtfdt];
 end
 
 function res = bc_conditions(ya, yb, x0_s, v0_s, x1_s, v1_s)
-    % Boundary conditions at tau=0 and tau=1
-    
     % Initial conditions
     res_initial = [
-        ya(1:3) - x0_s;  % x(0) = x0
-        ya(4:6) - v0_s   % v(0) = v0
+        ya(1:3) - x0_s;
+        ya(4:6) - v0_s
     ];
     
     % Final conditions
     res_final = [
-        yb(1:3) - x1_s;  % x(tf) = x1
-        yb(4:6) - v1_s   % v(tf) = v1
+        yb(1:3) - x1_s;
+        yb(4:6) - v1_s
     ];
     
-    % Transversality condition for free final time
-    lambda_x_f = yb(7:9);
+    % Transversality condition: H(tf) = 0
+    lambda_r_f = yb(7:9);
     lambda_v_f = yb(10:12);
     v_f = yb(4:6);
     
-    % For bang-bang: H = 1 + lambda_v^T v - |lambda_x|
-    H_final = 1 + dot(lambda_v_f, v_f) - norm(lambda_x_f);
+    % At optimal control: a = amax * lambda_v / |lambda_v|
+    % H = lambda_r^T v + lambda_v^T a + 1
+    %   = lambda_r^T v + |lambda_v| * amax + 1
+    H_final = dot(lambda_r_f, v_f) + norm(lambda_v_f) + 1;
     
     res = [res_initial; res_final; H_final];
 end
+
+
 
 function y0 = guess_init(tau, x0_s, v0_s, x1_s, v1_s, tf_guess)
     % Improved initial guess using polynomial interpolation
@@ -160,6 +172,73 @@ function y0 = guess_init(tau, x0_s, v0_s, x1_s, v1_s, tf_guess)
     lambda_v_guess = -(x1_s - x0_s) / (tf_guess^2);
     
     y0 = [x_guess; v_guess; lambda_x_guess; lambda_v_guess; tf_guess];
+end
+
+function plot_analysis(t, a_traj, a_mag, lambda_x, lambda_v, amax)
+    figure('Position', [100 100 1400 800]);
+    
+    % Acceleration magnitude
+    subplot(3,2,1);
+    plot(t, a_mag, 'b-', 'LineWidth', 2); hold on;
+    plot(t, amax*ones(size(t)), 'r--', 'LineWidth', 1.5);
+    grid on;
+    xlabel('Time [s]');
+    ylabel('Acceleration Magnitude [m/s^2]');
+    title('Acceleration Magnitude vs Time');
+    legend('||a(t)||', 'a_{max}', 'Location', 'best');
+    
+    % Acceleration components
+    subplot(3,2,2);
+    plot(t, a_traj(1,:), 'b-', 'LineWidth', 2); hold on;
+    plot(t, a_traj(2,:), 'r-', 'LineWidth', 2);
+    plot(t, a_traj(3,:), 'g-', 'LineWidth', 2);
+    grid on;
+    xlabel('Time [s]');
+    ylabel('Acceleration [m/s^2]');
+    title('Acceleration Components vs Time');
+    legend('a_x', 'a_y', 'a_z', 'Location', 'best');
+    
+    % Lambda_r (costate for position) magnitude
+    subplot(3,2,3);
+    lambda_r_mag = vecnorm(lambda_x);
+    plot(t, lambda_r_mag, 'm-', 'LineWidth', 2);
+    grid on;
+    xlabel('Time [s]');
+    ylabel('||\lambda_r|| (scaled)');
+    title('Position Costate Magnitude vs Time');
+    
+    % Lambda_r components
+    subplot(3,2,4);
+    plot(t, lambda_x(1,:), 'b-', 'LineWidth', 2); hold on;
+    plot(t, lambda_x(2,:), 'r-', 'LineWidth', 2);
+    plot(t, lambda_x(3,:), 'g-', 'LineWidth', 2);
+    grid on;
+    xlabel('Time [s]');
+    ylabel('\lambda_r (scaled)');
+    title('Position Costate Components vs Time');
+    legend('\lambda_{r,x}', '\lambda_{r,y}', '\lambda_{r,z}', 'Location', 'best');
+    
+    % Lambda_v (costate for velocity) magnitude
+    subplot(3,2,5);
+    lambda_v_mag = vecnorm(lambda_v);
+    plot(t, lambda_v_mag, 'c-', 'LineWidth', 2);
+    grid on;
+    xlabel('Time [s]');
+    ylabel('||\lambda_v|| (scaled)');
+    title('Velocity Costate Magnitude vs Time');
+    
+    % Lambda_v components
+    subplot(3,2,6);
+    plot(t, lambda_v(1,:), 'b-', 'LineWidth', 2); hold on;
+    plot(t, lambda_v(2,:), 'r-', 'LineWidth', 2);
+    plot(t, lambda_v(3,:), 'g-', 'LineWidth', 2);
+    grid on;
+    xlabel('Time [s]');
+    ylabel('\lambda_v (scaled)');
+    title('Velocity Costate Components vs Time');
+    legend('\lambda_{v,x}', '\lambda_{v,y}', '\lambda_{v,z}', 'Location', 'best');
+    
+    sgtitle('Optimal Control Analysis: Acceleration and Costates');
 end
 
 function animate_trajectory(t, x_traj, v_traj, a_traj, x0, x1, v0_init, amax)
