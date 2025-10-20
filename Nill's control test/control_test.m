@@ -12,7 +12,7 @@ params.J2 = 1.08263e-3; % J2 coefficient
 params.I_CB = 2/5 * params.mass * params.radius^2 * eye(3); % Moment of inertia [kg*m^2]
 
 % Proportional control gain
-params.Kp_att = 0.5; % [N*m]
+params.Kp_att = 10; % [N*m]
 
 % Initial Conditions
 altitude = 200e3; % 200 km
