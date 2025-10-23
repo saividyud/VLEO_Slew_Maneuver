@@ -1,6 +1,7 @@
 clc; clear; close all;
 
 %Polar circular orbit with simple initial orientation values
+
 Xi = [0 0 6678e3 -7789 0 0 1 1 1 1 0 0 1]';
 
 %propogating orbit with ode15s
