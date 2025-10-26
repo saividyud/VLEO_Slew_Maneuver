@@ -49,8 +49,8 @@ function Xd = Sat_template(t,X)
     
     % Kinetics(states 11:13)
     % can add extra perturbations/Control inputs here 
-    % LC = [.01; .01; .01];
-    LC = [0; 0; 0];
+    LC = [.01; .01; .01];
+    % LC = [0; 0; 0];
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11) 0];
 
     Xd(11:13) = inv(ICB)*(LC - WX* ICB * X(11:13));
