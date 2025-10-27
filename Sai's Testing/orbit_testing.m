@@ -3,9 +3,9 @@ clc
 close all
 
 %% Initial state (in Keplerian orbital elements)
-a = 350e3 + earthRadius; % 350 km above Earth semimajor axis
+a = 250e3 + earthRadius; % 250 km above Earth semimajor axis
 e = 0; % Eccentricity
-i = 0; % Inclination
+i = 20; % Inclination
 raan = 0; % Right ascension of ascending node
 aop = 0; % Argument of periapse
 ta = 0; % True anomaly
@@ -25,12 +25,12 @@ X_i = [r_i, v_i, beta_i, omega_i]';
 %% Simulating
 % Simualation bounds
 t0 = 0;
-t_span = 0.5 * 24 * 3600; % 1 day
+t_span = 10*60; % 0.5 hour
 dt = 1;
 
 ts = t0 : dt : t_span;
 
-opts = odeset('RelTol', 1e-3,'AbsTol', 1e-3);
+opts = odeset('RelTol', 1e-12,'AbsTol', 1e-12);
 [t, X] = ode45(@Sat_template, ts, X_i, opts);
 
 % Extract position and velocity from the state vector
