@@ -1,4 +1,4 @@
-function Xd = Sat_template(t,X)
+function Xd = Sat_template(t,X,LC)
 % Sat_template calculates the time rate of change of the state X at a time
 % t.
 %
@@ -46,6 +46,14 @@ function Xd = Sat_template(t,X)
     % quaternion kinematics (states 7:10) 
     B = [X(7) -X(8) -X(9) -X(10); X(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
     Xd(7:10) = .5*B*[0;X(11);X(12);X(13)];
+
+    % %calculating u
+    % w_r = ;
+    % wdot_r = ;
+    % P = ;
+    % delw = X(11:13) - w_r;
+    % u = -Kp*X(8:10) - P * delw +I*wdot_r -cross(X(11:13),w_r) + X(11:13)*I*X(11:13) - LC;
+
     
     % Kinetics(states 11:13)
     % can add extra perturbations/Control inputs here 
