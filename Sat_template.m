@@ -50,9 +50,9 @@ function Xd = Sat_template(t,X)
     w_r = [0;0;0];
     wdot_r = [0;0;0];
     P = [10 0 0; 0 10 0; 0 0 10];
-    Kp = [.01 0 0 ; 0 .01 0 ; 0 0 .01];
+    Kp = [.5 0 0 ; 0 .5 0 ; 0 0 .5];
     delw = X(11:13) - w_r;
-    u = -Kp * X(8:10) - P * delw + ICB * wdot_r - cross(X(11:13),w_r) + X(11:13)' * ICB * X(11:13);
+    u = -Kp * ([5,5,5]' -X(8:10)) - P * delw + ICB * wdot_r - cross(X(11:13),w_r) + X(11:13)' * ICB * X(11:13);
 
     
     % Kinetics(states 11:13)
