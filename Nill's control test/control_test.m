@@ -168,7 +168,7 @@ figure('Name', '3D Attitude Visualization', 'Position', [100 100 1200 800]);
 [xs, ys, zs] = sphere(50);
 
 n_frames = length(tspan);
-frame_skip = max(1, floor(n_frames / 100));
+frame_skip = max(1, floor(n_frames / 25));
 
 for i = 1:frame_skip:n_frames
     clf;
@@ -230,7 +230,6 @@ for i = 1:frame_skip:n_frames
     xlim([-1.5 1.5]); ylim([-1.5 1.5]); zlim([-1.5 1.5]);
 
     drawnow;
-    pause(0.05);
 end
 
 % === Pointing Error Plot ===
