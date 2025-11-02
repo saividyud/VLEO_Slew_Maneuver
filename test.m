@@ -29,6 +29,6 @@ for i = 1:Maxitr
   err = Xref - Xhat;
 
   % Might need to calculate Jacobian and linearize the dynamics, but dont 
-  % worry about it right now
+  % worry about it right no
 
 end
