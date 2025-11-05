@@ -1,0 +1,3 @@
+[submodule "Sai Testing/ADBSat"]
+	path = Sai Testing/ADBSat
+	url = https://github.com/nhcrisp/ADBSat.git
