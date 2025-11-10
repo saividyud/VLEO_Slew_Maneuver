@@ -1,7 +1,7 @@
 clc; clear; close all;
 
 %Polar circular orbit with random initial orientation and initial angular velocity values
-Xi = [0, 0, 6678e3, -7789, 0, 0, 20*rand, 20*rand-10, 20*rand-10, 20*rand-10, 2*rand-1, 2*rand-1, 2*rand-1]';
+Xi = [0, 0, 6678e3, -7789, 0, 0, .1*rand, 1*rand, 1*rand, .1*rand, .01*rand, .01*rand, .01*rand]';
 Tf = 40;
 
 %initial state
