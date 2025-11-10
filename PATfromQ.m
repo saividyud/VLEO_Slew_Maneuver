@@ -1,11 +1,12 @@
 function [e_hat, phi] = PATfromQ(beta)
 % PATfromQ calculates the principal axis and rotation about the principal
 % axis according to Euler's Principal Axis Theorem given a quaternion.
+%
 % Parameters
 % ----------
 % beta : 4x1 quaternion
 %   Input quaternion
-
+%
 % Returns
 % -------
 % e_hat : 3x1 unit vector

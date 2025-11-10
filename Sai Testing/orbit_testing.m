@@ -31,7 +31,7 @@ dt = 1;
 ts = t0 : dt : t_span;
 
 opts = odeset('RelTol', 1e-12,'AbsTol', 1e-12);
-[t, X] = ode45(@Sat_template, ts, X_i, opts);
+[t, X] = ode45(@Sat_template_Sai, ts, X_i, opts);
 
 % Extract position and velocity from the state vector
 rs = X(:, 1:3);

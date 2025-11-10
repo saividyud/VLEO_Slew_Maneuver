@@ -1,11 +1,12 @@
 function R_BI = DCMfromQ(beta)
 % DCMfromQ calculates the DCM from inertial to body frame given a 
 % quaternion.
+%
 % Parameters
 % ----------
 % beta : 4x1 quaternion
 %   Input quaternion
-
+%
 % Returns
 % -------
 % R_BI : 3x3 matrix
