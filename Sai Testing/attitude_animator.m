@@ -153,7 +153,7 @@ o_2_text = text(o_2(1), o_2(2), o_2(3), 'o_2', 'color', 'r', Parent=ax2);
 o_3_text = text(o_3(1), o_3(2), o_3(3), 'o_3', 'color', 'r', Parent=ax2);
 
 % Reading in CubeSat model
-data = stlread('./Sai Testing/ADBSat/inou/obj_files/6U CubeSat.stl');
+data = stlread('./Sai Testing/6U CubeSat.stl');
 triangle_mat = data.ConnectivityList;
 points = 2 * data.Points;
 
