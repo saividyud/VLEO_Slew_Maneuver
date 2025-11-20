@@ -46,26 +46,10 @@ function Xd = Sat_template(t,X)
     B = [X(7) -X(8) -X(9) -X(10); X(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
     Xd(7:10) = .5*B*[0;X(11);X(12);X(13)];
 
-    %calculating u
-    w_r = [0;0;0];
-    wdot_r = [0;0;0];
-    P = [.15 0 0; 0 .15 0; 0 0 .15];
-    Kp = [.0025 0 0 ; 0 .0025 0 ; 0 0 .0025];
-    delw = X(11:13) - w_r;
-    u = -Kp * X(8:10)
-    u = u- P * delw 
-    u = u + ICB * wdot_r 
-    u = u - cross(X(11:13),w_r) 
-    % u = u + X(11:13)' * ICB * X(11:13)
-    if abs(norm(u)) >= 1
-        disp("nonsense")
-        disp(norm(u))
-    end
+
     % Kinetics(states 11:13)
     % can add extra perturbations/Control inputs here 
-    %LC = control_torques(t, X);
-    LC = u;
-    %LC = [0;0;0];
+    LC = control_torques(t, X);
 
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11) 0];
 

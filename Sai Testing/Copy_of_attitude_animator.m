@@ -3,12 +3,12 @@ clc
 close all
 
 %% Initializing video writer
-save = false;
+save = true;
 
 if save
-    v = VideoWriter('./Sai Testing/myAnimation.mp4', 'MPEG-4');
-    v.FrameRate = 30; % Set frame rate to 60 frames per second
-    v.Quality = 75;   % Set video quality (0-100)
+    v = VideoWriter('./Sai Testing/myAnimation3.mp4', 'MPEG-4');
+    v.FrameRate = 30; % Set frame rate to 30 frames per second
+    v.Quality = 100;   % Set video quality (0-100)
     open(v);
 end
 
@@ -51,7 +51,7 @@ X_i = [r_i, v_i, beta_i, omega_i]';
 %% Simulating
 % Simualation bounds
 t0 = 0;
-t_span = 60*5; % n*1 min
+t_span = 60*10; % n*1 min
 dt = .1;
 
 ts = t0 : dt : t_span;
@@ -66,20 +66,25 @@ betas = X(:, 7:10);
 omegas = X(:, 11:13);
 
 % Extract torques
-% torques = zeros(length(rs), 3);
-% for i = 1 : 1 : length(rs)
-%     torques(i, :) = control_torques(ts(i), X(i, :)')';
-% end
+torques = zeros(length(rs), 3);
+for i = 1 : 1 : length(rs)
+    torques(i, :) = control_torques(ts(i), X(i, :)')';
+end
 
 %% Reading plot
-fig = figure(Name="CubeSat");
+fig = figure(Name="CubeSat", Color="white");
+
+if save == true
+    fig.Position = [0, 0, 1920, 994];
+else
+    fig.WindowState = "maximized";
+end
+
 set(fig, 'CloseRequestFcn', @myCloseRequestFunction);
 
 % Splitting figure into two plots: left is position with the Earth for
 % reference and right is orientation of satellite
 t = tiledlayout(fig, 6, 2, TileSpacing="compact", Padding="compact");
-
-fig.WindowState = "maximized";
 
 %% Plotting position
 ax1 = nexttile(t, 1, [3, 1]);
@@ -211,11 +216,11 @@ xlabel(ax2, 'X')
 ylabel(ax2, 'Y')
 zlabel(ax2, 'Z')
 
-title(ax2, 'Inertial and Orbital Reference Frames');
-legend(ax2, [inertial_arrows{1}, orbital_arrows{1}, body_arrows{1}], {'Inertial Frame', 'Orbital Frame', 'Body Frame'}, Location="northwest");
+title(ax2, 'Satellite Attitude');
+legend(ax2, [inertial_arrows{1}, orbital_arrows{1}, body_arrows{1}], {'Inertial', 'Orbital', 'Body'}, Location="northwest");
 
 time_str = ['Time = ', num2str(round(ts(1) / 60, 2)), ' min'];
-time_ann = annotation(fig, 'textbox', [0.1 0.9 0.06 0.04], 'String', {time_str}, FitBoxToText="off");
+time_ann = annotation(fig, 'textbox', [0.1 0.9 0.08 0.06], 'String', {time_str}, FitBoxToText="off");
 time_ann.HorizontalAlignment = "center";
 time_ann.VerticalAlignment = "middle";
 time_ann.BackgroundColor = "white";
@@ -229,7 +234,7 @@ pitches = rad2deg(pitches);
 yaws = rad2deg(yaws);
 
 % Plotting the angles over time
-plot(ax3, ts/60, rolls, LineWidth=1, Color="r")
+plot(ax3, ts/60, rolls, LineWidth=1, Color="r");
 hold on
 plot(ax3, ts/60, pitches, LineWidth=1, Color="b");
 plot(ax3, ts/60, yaws, LineWidth=1, Color="k");
@@ -257,7 +262,7 @@ ax4 = nexttile(t, 6, [2, 1]);
 omegas = rad2deg(omegas);
 
 % Plotting the angular rate over time
-plot(ax4, ts/60, omegas(:, 1), LineWidth=1, Color="r")
+plot(ax4, ts/60, omegas(:, 1), LineWidth=1, Color="r");
 hold on
 plot(ax4, ts/60, omegas(:, 2), LineWidth=1, Color="b");
 plot(ax4, ts/60, omegas(:, 3), LineWidth=1, Color="k");
@@ -279,40 +284,42 @@ ylim(ax4, [min(omegas(:)) - 0.1*range, max(omegas(:)) + 0.1*range])
 
 legend(ax4, [roll_rate_marker, pitch_rate_marker, yaw_rate_marker], {"\omega_1", "\omega_2", "\omega_3"}, Location="best")
 
-% %% Plotting torques
-% ax5 = nexttile(t, 10, [2, 1]);
-% 
-% % Plotting the angular rate over time
-% plot(ax5, ts/60, torques(:, 1), LineWidth=1, Color="r")
-% hold on
-% plot(ax5, ts/60, torques(:, 2), LineWidth=1, Color="b");
-% plot(ax5, ts/60, torques(:, 3), LineWidth=1, Color="k");
-% 
-% tau_1_marker = scatter(ax5, ts(1)/60, torques(1, 1), "r", 'filled');
-% tau_2_marker = scatter(ax5, ts(1)/60, torques(1, 2), "b", 'filled');
-% tau_3_marker = scatter(ax5, ts(1)/60, torques(1, 3), "k", 'filled');
-% 
-% ax5line = xline(ax5, ts(1), "k", LineStyle="--", LineWidth=1);
-% hold off
-% 
-% xlabel(ax5, "Time [min]")
-% ylabel(ax5, "Torque [Nm]")
-% 
-% grid on
-% 
-% range = abs(max(torques(:)) - min(torques(:)));
-% ylim(ax5, [min(torques(:)) - 0.1*range, max(torques(:)) + 0.1*range])
-% 
-% legend(ax5, [tau_1_marker, tau_2_marker, tau_3_marker], {"\tau_1", "\tau_2", "\tau_3"}, Location="best")
+%% Plotting torques
+ax5 = nexttile(t, 10, [2, 1]);
+
+% Plotting the angular rate over time
+plot(ax5, ts/60, torques(:, 1), LineWidth=1, Color="r");
+hold on
+plot(ax5, ts/60, torques(:, 2), LineWidth=1, Color="b");
+plot(ax5, ts/60, torques(:, 3), LineWidth=1, Color="k");
+
+tau_1_marker = scatter(ax5, ts(1)/60, torques(1, 1), "r", 'filled');
+tau_2_marker = scatter(ax5, ts(1)/60, torques(1, 2), "b", 'filled');
+tau_3_marker = scatter(ax5, ts(1)/60, torques(1, 3), "k", 'filled');
+
+ax5line = xline(ax5, ts(1), "k", LineStyle="--", LineWidth=1);
+hold off
+
+xlabel(ax5, "Time [min]")
+ylabel(ax5, "Torque [Nm]")
+
+grid on
+
+range = abs(max(torques(:)) - min(torques(:)));
+ylim(ax5, [min(torques(:)) - 0.1*range, max(torques(:)) + 0.1*range])
+
+legend(ax5, [tau_1_marker, tau_2_marker, tau_3_marker], {"\tau_1", "\tau_2", "\tau_3"}, Location="best")
 
 %% Animating
 start = 1;
-step_size = 5;
+step_size = 50;
+
+fontsize(fig, scale=2)
 
 for i = start : step_size : length(rs)
     if isvalid(fig)
         % Updating time
-        time_str = ['Time = ', num2str(round(ts(i)/60, 2)), ' min'];
+        time_str = ['Time', newline, num2str(round(ts(i)/60, 2)), ' min'];
         time_ann.String = {time_str};
         
         % Extract current position and velocity vectors
@@ -395,22 +402,23 @@ for i = start : step_size : length(rs)
         yaw_rate_marker.YData = omegas(i, 3);
 
         ax4line.Value = ts(i)/60;
-        % 
-        % % Updating fifth axis
-        % tau_1_marker.XData = ts(i)/60;
-        % tau_1_marker.YData = torques(i, 1);
-        % 
-        % tau_2_marker.XData = ts(i)/60;
-        % tau_2_marker.YData = torques(i, 2);
-        % 
-        % tau_3_marker.XData = ts(i)/60;
-        % tau_3_marker.YData = torques(i, 3);
+
+        % Updating fifth axis
+        tau_1_marker.XData = ts(i)/60;
+        tau_1_marker.YData = torques(i, 1);
+
+        tau_2_marker.XData = ts(i)/60;
+        tau_2_marker.YData = torques(i, 2);
+
+        tau_3_marker.XData = ts(i)/60;
+        tau_3_marker.YData = torques(i, 3);
 
         ax5line.Value = ts(i)/60;
     
         drawnow;
         
         if save
+            fig.Position = [0, 0, 1920, 994];
             frame = getframe(gcf); % Capture the current figure as a frame
             writeVideo(v, frame);  % Write the captured frame to the video object
         end
