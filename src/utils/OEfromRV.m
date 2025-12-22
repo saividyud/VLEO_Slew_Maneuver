@@ -5,10 +5,11 @@ function TBorbit = OEfromRV(rbar, vbar)
 global mu_sun; global mu_earth;
 mu_sun = 132712440000.00002;
 mu_earth = 3.986004e14;
-mu = mu_sun;
+mu = mu_earth;
 
-%rx = rbar(1); ry = rbar(2); rz = rbar(3);
-%vx = vbar(1); vy = vbar(2); vz = vbar(3);
+% Ensure column vectors
+rbar = rbar(:);
+vbar = vbar(:);
 
 R = norm(rbar);
 V = norm(vbar);
@@ -16,23 +17,41 @@ a = 1/(2/R - V^2/mu);  %SEMI-MAJOR AXIS
 hbar = cross(rbar, vbar);   %ANGULAR MOMENTTUM VECTOR
 h = norm(hbar);
 p = h^2/mu; %PARAMETER
-e = sqrt(1 - p/a);  %ECCENTRICITY
+e = real(sqrt(1 - p/a));  %ECCENTRICITY
 En = -mu/2/a;   %Energy
 sig = dot(rbar, vbar)/sqrt(mu); %QUANTITY 'SIGMA'
 cbar = cross(vbar, hbar) - mu*rbar/R;
 ihhat = hbar/h;
-iehat = cbar/(mu*e);
+
+% Handle small eccentricity
+if e < 1e-9
+    e = 0;
+    iehat = [1; 0; 0]; % Arbitrary reference for circular orbit (Column vector)
+else
+    iehat = cbar/(mu*e);
+end
+
 imhat = cross(ihhat, iehat);
 imhat = imhat/norm(imhat);
-i = acos(ihhat(3)); %INCLINATION
+i = acos(ihhat(3)); %INCLINATION;
 si = sin(i);
-OMEGA = atan2(ihhat(1)/si, -ihhat(2)/si);
+
+% Handle small inclination
+if abs(si) < 1e-9
+    OMEGA = 0;
+else
+    OMEGA = atan2(ihhat(1)/si, -ihhat(2)/si);
+end
+
 if OMEGA < 0
     OMEGA = OMEGA + 2*pi;
 end
-omega = atan2(iehat(3)/si, imhat(3)/si);   %ARGUMENT OF PERIAPSIS
-if omega < 0
-    omega = omega + 2*pi;
+
+% Handle undefined Argument of Periapsis for circular/equatorial
+if e < 1e-9 || abs(si) < 1e-9
+    omega = 0;
+else
+    omega = atan2(iehat(3)/si, imhat(3)/si);   %ARGUMENT OF PERIAPSIS
 end
 
 %%%ROI
