@@ -38,7 +38,7 @@ PC = DE440Coeff;
 % read Earth gravity field coefficients
 Cnm = zeros(361,361);
 Snm = zeros(361,361);
-fid = fopen('GGM03C.txt','r');
+fid = fopen(which('GGM03C.txt'),'r');
 for n=0:360
     for m=0:n
         temp = fscanf(fid,'%d %d %f %f %f %f',[6 1]);
@@ -49,7 +49,7 @@ end
 fclose(fid);
 
 % read Earth orientation parameters
-fid = fopen('EOP-All.txt','r');
+fid = fopen(which('EOP-All.txt'),'r');
 %  ----------------------------------------------------------------------------------------------------
 % |  Date    MJD      x         y       UT1-UTC      LOD       dPsi    dEpsilon     dX        dY    DAT
 % |(0h UTC)           "         "          s          s          "        "          "         "     s 
@@ -77,7 +77,7 @@ end
 fclose(fid);
 
 % read space weather data
-fid = fopen('SW-All.txt','r');
+fid = fopen(which('SW-All.txt'),'r');
 %  ---------------------------------------------------------------------------------------------------------------------------------
 % |                                                                                             Adj     Adj   Adj   Obs   Obs   Obs 
 % | yy mm dd BSRN ND Kp Kp Kp Kp Kp Kp Kp Kp Sum Ap  Ap  Ap  Ap  Ap  Ap  Ap  Ap  Avg Cp C9 ISN F10.7 Q Ctr81 Lst81 F10.7 Ctr81 Lst81
@@ -111,7 +111,7 @@ end
 fclose(fid);
 
 % read solar storm indices
-fid = fopen('SOLFSMY.txt','r');
+fid = fopen(which('SOLFSMY.txt'),'r');
 %  ------------------------------------------------------------------------
 % | YYYY DDD   JulianDay  F10   F81c  S10   S81c  M10   M81c  Y10   Y81c
 %  ------------------------------------------------------------------------
@@ -119,7 +119,7 @@ SOLdata = fscanf(fid,'%d %d %f %f %f %f %f %f %f %f %f',[11 inf]);
 fclose(fid);
 
 % read Ap data
-fid = fopen('SOLRESAP.txt','r');
+fid = fopen(which('SOLRESAP.txt'),'r');
 %  ------------------------------------------------------------------------
 % | YYYY DDD  F10 F10B Ap1 to Ap8
 %  ------------------------------------------------------------------------
@@ -127,7 +127,7 @@ APdata = fscanf(fid,'%d %d %d %d %d %d %d %d %d %d %d %d',[12 inf]);
 fclose(fid);
 
 % read geomagnetic storm indices
-fid = fopen('DTCFILE.txt','r');
+fid = fopen(which('DTCFILE.txt'),'r');
 %  ------------------------------------------------------------------------
 % | DTC YYYY DDD   DTC1 to DTC24
 %  ------------------------------------------------------------------------
@@ -140,7 +140,7 @@ AuxParam = struct('Mjd_UTC',0,'area_solar',0,'area_drag',0,'mass',0,'Cr',0,...
                   'planets',0,'SolidEarthTides',0,'OceanTides',0,'Relativity',0);
 
 % epoch state (Envisat) in ITRF
-fid = fopen('InitialState.txt','r');
+fid = fopen(which('InitialState.txt'),'r');
 tline = fgetl(fid);
 year = str2num(tline(1:4));
 month = str2num(tline(6:7));

@@ -28,13 +28,13 @@ function [] = load_hpop_data()
     fprintf('Loading HPOP data files...\n');
     
     % Load JPL ephemeris
-    load('HPOP/DE440Coeff.mat');
+    load('DE440Coeff.mat');
     PC = DE440Coeff;
     
     % Read Earth gravity field coefficients
     Cnm = zeros(361,361);
     Snm = zeros(361,361);
-    fid = fopen('HPOP/GGM03C.txt','r');
+    fid = fopen(which('GGM03C.txt'),'r');
     for n=0:360
         for m=0:n
             temp = fscanf(fid,'%d %d %f %f %f %f',[6 1]);
@@ -45,7 +45,7 @@ function [] = load_hpop_data()
     fclose(fid);
     
     % Read Earth orientation parameters
-    fid = fopen('HPOP/EOP-All.txt','r');
+    fid = fopen(which('EOP-All.txt'),'r');
     eopdata = [];
     while ~feof(fid)
         tline = fgetl(fid);
@@ -70,7 +70,7 @@ function [] = load_hpop_data()
     fclose(fid);
     
     % Read space weather data
-    fid = fopen('HPOP/SW-All.txt','r');
+    fid = fopen(which('SW-All.txt'),'r');
     swdata = [];
     while ~feof(fid)
         tline = fgetl(fid);
@@ -96,17 +96,17 @@ function [] = load_hpop_data()
     fclose(fid);
     
     % Read solar storm indices
-    fid = fopen('HPOP/SOLFSMY.txt','r');
+    fid = fopen(which('SOLFSMY.txt'),'r');
     SOLdata = fscanf(fid,'%d %d %f %f %f %f %f %f %f %f %f',[11 inf]);
     fclose(fid);
     
     % Read Ap data
-    fid = fopen('HPOP/SOLRESAP.txt','r');
+    fid = fopen(which('SOLRESAP.txt'),'r');
     APdata = fscanf(fid,'%d %d %d %d %d %d %d %d %d %d %d %d',[12 inf]);
     fclose(fid);
     
     % Read geomagnetic storm indices
-    fid = fopen('HPOP/DTCFILE.txt','r');
+    fid = fopen(which('DTCFILE.txt'),'r');
     DTCdata = fscanf(fid,'%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d',[26 inf]);
     fclose(fid);
 end

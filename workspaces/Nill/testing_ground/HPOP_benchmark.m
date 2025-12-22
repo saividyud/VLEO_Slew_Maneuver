@@ -8,15 +8,18 @@ fprintf(' SGP4 vs Custom vs HPOP\n');
 fprintf('========================================\n\n');
 
 %% Setup paths
-addpath('SGP4');
-addpath('HPOP');
+% addpath('SGP4');
+% addpath('HPOP');
 
 %% Initialize HPOP globals and data
 load_hpop_data()
 
-%% ISS TLE (September 26, 2025)
-tle_line1 = '1 25544U 98067A   25269.21152988  .00014701  00000-0  26152-3 0  9992';
+%% ISS TLE (January 1, 2024) - Updated to match available EOP data
+tle_line1 = '1 25544U 98067A   24001.21152988  .00014701  00000-0  26152-3 0  9992';
 tle_line2 = '2 25544  51.6332 166.3292 0002995  10.9396 349.1657 15.50384251530832';
+% Original TLE (September 26, 2025) - Future date relative to EOP file
+% tle_line1 = '1 25544U 98067A   25269.21152988  .00014701  00000-0  26152-3 0  9992';
+% tle_line2 = '2 25544  51.6332 166.3292 0002995  10.9396 349.1657 15.50384251530832';
 
 %% Parse TLE
 [satdata] = parse_tle(tle_line1, tle_line2);
