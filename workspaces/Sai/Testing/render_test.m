@@ -62,7 +62,7 @@ R_BI = [
 
 beta_i = QfromDCM(R_BI);
 
-data = stlread('./Sai Testing/ADBSat/inou/obj_files/6U CubeSat.stl');
+data = stlread(fullfile(fileparts(mfilename('fullpath')), '6U CubeSat.STL'));
 triangle_mat = data.ConnectivityList;
 points = 2 * data.Points;
 

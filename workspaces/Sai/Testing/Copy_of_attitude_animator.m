@@ -6,7 +6,7 @@ close all
 save = true;
 
 if save
-    v = VideoWriter('./Sai Testing/myAnimation3.mp4', 'MPEG-4');
+    v = VideoWriter(fullfile(fileparts(mfilename('fullpath')), '../../../assets/myAnimation3.mp4'), 'MPEG-4');
     v.FrameRate = 30; % Set frame rate to 30 frames per second
     v.Quality = 100;   % Set video quality (0-100)
     open(v);
@@ -158,7 +158,7 @@ o_2_text = text(o_2(1), o_2(2), o_2(3), 'o_2', 'color', 'r', Parent=ax2);
 o_3_text = text(o_3(1), o_3(2), o_3(3), 'o_3', 'color', 'r', Parent=ax2);
 
 % Reading in CubeSat model
-data = stlread('./Sai Testing/6U CubeSat.stl');
+data = stlread(fullfile(fileparts(mfilename('fullpath')), '6U CubeSat.STL'));
 triangle_mat = data.ConnectivityList;
 points = 2 * data.Points;
 
