@@ -39,6 +39,9 @@ vs = X(:, 4:6);
 betas = X(:, 7:10);
 omegas = X(:, 11:13);
 
+% Save simulation data for other scripts
+save('orbit_data.mat', 'ts', 'rs', 'vs', 'betas', 'omegas', 'a');
+
 %% Plotting
 % Plotting position
 fig = figure(1);

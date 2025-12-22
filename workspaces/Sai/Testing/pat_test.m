@@ -2,6 +2,15 @@ clear
 clc
 close all
 
+if ~exist('rs', 'var')
+    if exist('orbit_data.mat', 'file')
+        load('orbit_data.mat');
+    else
+        fprintf('Data not found. Running orbit_testing...\n');
+        orbit_testing;
+    end
+end
+
 %% Defining orbital reference frame axes
 step = 1;
 
