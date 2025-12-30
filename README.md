@@ -54,5 +54,4 @@ Before merging code to `src/`:
 ## Contributors
 
 - Nill
-- Sai
-- Vidyud
+- Sai Vidyud
