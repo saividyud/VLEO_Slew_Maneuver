@@ -1,33 +1,58 @@
 # VLEO Slew Maneuver
 
-Exploring the feasibility of using ion thrusters for slew maneuvers in Very Low Earth Orbit (VLEO).
+Computationally determining the feasibility of using ion thrusters for slew maneuvers in Very Low Earth Orbit (VLEO).
 
 ## Project Structure
 
-The repository is organized as follows:
-
 ```text
 .
-├── src/                # Core source code and utilities
-│   ├── utils/          # Mathematical conversions (e.g., DCMfromQ)
-│   └── dynamics/       # Physics models (e.g., J2, control_torques)
-├── lib/                # External libraries (ADBSat, HPOP, SGP4)
-├── tests/              # Unit tests and benchmarks
-├── workspaces/         # User-specific working directories
-│   ├── Nill/
-│   └── Sai/
-└── docs/               # Documentation and reports
+├── src/                # Core source code (must meet compliance standards)
+│   ├── utils/          # Mathematical conversions (DCM, quaternions, orbital elements)
+│   └── dynamics/       # Physics models (J2, control torques)
+├── lib/                # External libraries (HPOP, SGP4, ADBSat) - DO NOT MODIFY
+├── tests/              # Unit tests and verification scripts
+├── examples/           # Example use cases for each function
+├── docs/               # Documentation and theory
+│   └── theory.md       # Mathematical foundations and citations
+├── data/               # Shared data files (TLE, ephemeris)
+└── workspaces/         # Personal development sandboxes
+    ├── Nill/
+    └── Sai/
 ```
 
-## Setup and Usage
+## Setup
 
-To ensure all functions and libraries are accessible, you **must** configure the MATLAB path before running any scripts.
+1. Open MATLAB in the repository root
+2. Run the setup script:
+   ```matlab
+   setup_project
+   ```
+3. All paths are now configured
 
-1.  Open MATLAB in the root directory of this repository.
-2.  Run the setup script in the Command Window:
-    ```matlab
-    setup_project
-    ```
-    This script will add all necessary folders (`src`, `lib`, `tests`, etc.) to your MATLAB path.
+## Project Standards
 
-3.  You can now run any script or function (e.g., from `tests/` or your workspace) without worrying about file locations.
+See [PROJECT_STANDARDS.md](PROJECT_STANDARDS.md) for complete guidelines.
+
+### Quick Reference
+
+| Item | Standard |
+|------|----------|
+| ECI Frame | EME2000 (J2000) |
+| Units | SI (meters, seconds, radians) |
+| Quaternion | Scalar-first `[q0; q1; q2; q3]` |
+| Naming | `r_sat_ECI`, `v_sat_ECI`, `q_ECI_to_body` |
+
+### Compliance Checklist
+
+Before merging code to `src/`:
+- [ ] Test file in `tests/`
+- [ ] Example file in `examples/`
+- [ ] Theory documented in `docs/theory.md`
+- [ ] No magic numbers
+- [ ] SI units throughout
+
+## Contributors
+
+- Nill
+- Sai
+- Vidyud
