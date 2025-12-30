@@ -18,6 +18,8 @@ function setup_project()
         fullfile(root_dir, 'lib', 'SGP4');
         fullfile(root_dir, 'lib', 'Kumar_Examples');
         fullfile(root_dir, 'tests');
+        fullfile(root_dir, 'examples');
+        fullfile(root_dir, 'data');
     };
 
     % Add directories
