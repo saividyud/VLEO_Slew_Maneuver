@@ -21,7 +21,24 @@ function Xd = Sat_template(t,X)
 % Xd and X are 13 dimensional state vectors
 % X has to be vertical for function to work
 % t is time(used for numerical integration)
-% LC is initial torques
+
+    %% Stuff that changes for each iteration for aerodynamics
+    env = [alt*1e3, inc/2, 0, 106, 0, 65, 65, ones(1,7)*3, 1]; % Environment variables
+    % Requires these values:
+    % [Altitude, latitude, longitude, day of the year, seconds of the day,
+    % magnetic indices [3, 3, 3, 3, 3, 3, 3], anomalous oxygen? KEEP THIS TRUE]
+
+    aoa_deg = 0; % Angle of attack [deg]
+    aos_deg = 0; % Angle of sideslip [deg]
+
+    inparam = environment(inparam, env(1),env(2),env(3),env(4),env(5),env(6),env(7),env(8:14),env(15));
+
+    
+
+
+    %% Main computation
+    % LC is initial torques
+
     %initialization
     Xd = zeros(13,1);
     

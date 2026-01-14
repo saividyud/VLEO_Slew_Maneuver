@@ -30,9 +30,12 @@ v_i = RV(:, 2)'; % [m/s]
 % Computing intial body frame such that b_1 is in the direction of motion,
 % b_3 is pointing towards surface (camera pointing), and b_2 is normal to
 % both b_3 and b_1
+% b_1_i = v_i' / norm(v_i);
+% b_3_i = -r_i' / norm(r_i);
+% b_2_i = cross(b_3_i, b_1_i); % Calculate b_2 as the cross product of b_3 and b_1
 b_1_i = v_i' / norm(v_i);
-b_3_i = -r_i' / norm(r_i);
-b_2_i = cross(b_3_i, b_1_i); % Calculate b_2 as the cross product of b_3 and b_1
+b_2_i = -r_i' / norm(r_i);
+b_3_i = cross(b_1_i, b_2_i);
 
 % Computing initial quaternion from these initial body axes
 R_BI_i = [
@@ -70,6 +73,8 @@ torques = zeros(length(rs), 3);
 for i = 1 : 1 : length(rs)
     torques(i, :) = control_torques(ts(i), X(i, :)')';
 end
+
+
 
 %% Reading plot
 fig = figure(Name="CubeSat");
