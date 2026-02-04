@@ -57,7 +57,7 @@ dt = 1;
 ts = t0 : dt : t_span;
 
 opts = odeset('RelTol', 1e-12,'AbsTol', 1e-12);
-[t, X] = ode45(@Sat_template_Sai, ts, X_i, opts);
+[t, X] = ode45(@Sat_template2_linear, ts, X_i, opts);
 
 % Extract position and velocity from the state vector
 rs = X(:, 1:3);
@@ -156,7 +156,7 @@ o_2_text = text(o_2(1), o_2(2), o_2(3), 'o_2', 'color', 'r', Parent=ax2);
 o_3_text = text(o_3(1), o_3(2), o_3(3), 'o_3', 'color', 'r', Parent=ax2);
 
 % Reading in CubeSat model
-data = stlread(fullfile(fileparts(mfilename('fullpath')), '6U CubeSat.STL'));
+data = stlread(fullfile(fileparts(mfilename('fullpath')), './dynamics/6U CubeSat.STL'));
 triangle_mat = data.ConnectivityList;
 points = 2 * data.Points;
 
@@ -429,4 +429,13 @@ end
 function myCloseRequestFunction(src, ~)
     disp('Figure is closing!');
     delete(src); 
+end
+
+function arrows = draw_frame(vectors, color, parent)
+    
+    arrows = cell(1, 3);
+    for i = 1:3
+        arrows{i} = quiver3(0, 0, 0, vectors(1, i), vectors(2, i), vectors(3, i), color, 'LineWidth', 2, Parent=parent);
+    end
+
 end
