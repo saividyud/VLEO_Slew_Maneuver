@@ -11,7 +11,9 @@ function setup_project()
         fullfile(root_dir, 'src');
         fullfile(root_dir, 'src', 'utils');
         fullfile(root_dir, 'src', 'dynamics');
+        fullfile(root_dir, 'src', 'gui');
         fullfile(root_dir, 'lib');
+        fullfile(root_dir, 'simulations');
         fullfile(root_dir, 'lib', 'ADBSat');
         fullfile(root_dir, 'lib', 'Gyroscope');
         fullfile(root_dir, 'lib', 'HPOP');
