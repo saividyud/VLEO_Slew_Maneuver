@@ -1,4 +1,8 @@
 function openSimulationGUI
+    evalin('base', 'clear'); % Clear the base workspace to ensure a clean state for the GUI
+    clc
+    close all
+
     % 1. Create the Main Window (16:9 Aspect Ratio)
     % Position format: [left, bottom, width, height]
     % 800 width / 450 height = 1.77 (16:9)

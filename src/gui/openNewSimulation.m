@@ -4,7 +4,7 @@ function openNewSimulation(mainFigHandle)
     mainFigHandle.Visible = 'off';
 
     % Create the New Window
-    subFig = uifigure('Name', 'New Simulation', ...
+    subFig = uifigure('Name', 'New Simulation - Unsaved', ...
                       'Position', [500, 300, 800, 450]);
 
     % Define colors
@@ -19,10 +19,11 @@ function openNewSimulation(mainFigHandle)
         30,... 
         30,...
         '1x',...
-        50,...
-        50,...
-        50,...
-        50,...
+        40,...
+        40,...
+        40,...
+        40,...
+        40,...
         '1x',...
         30,...
     };
@@ -35,12 +36,12 @@ function openNewSimulation(mainFigHandle)
     };
 
     % Add a Title to the Sub-Window (Center of content area)
-    lbl = uilabel(subGl, 'Text', 'New Simulation');
+    lbl = uilabel(subGl, 'Text', 'New Simulation - Unsaved');
     lbl.FontName = 'Times New Roman';
     lbl.FontSize = 24;
     lbl.FontWeight = 'bold';
     lbl.Layout.Row = 1;
-    lbl.Layout.Column = 3;
+    lbl.Layout.Column = [1, 5];
     lbl.HorizontalAlignment = 'center';
 
     %% Adding buttons
@@ -48,7 +49,7 @@ function openNewSimulation(mainFigHandle)
     btnBack = uibutton(subGl, 'Text', 'Back');
     btnBack.FontName = 'Times New Roman';
     btnBack.FontSize = 14;
-    btnBack.Layout.Row = 9;     % Bottom Row
+    btnBack.Layout.Row = 10;     % Bottom Row
     btnBack.Layout.Column = 1;  % Left Column
     btnBack.BackgroundColor = salmonColor;
 
@@ -79,28 +80,34 @@ function openNewSimulation(mainFigHandle)
     btnResults.Layout.Row = 2;
     btnResults.Layout.Column = 5;
 
+    % Simulation parameter button
+    btnSimParams = uibutton(subGl, 'Text', 'Set Simulation Parameters');
+    applyButtonStyle(btnSimParams)
+    btnSimParams.Layout.Row = 4;
+    btnSimParams.Layout.Column = 3;
+
     % Orbital parameter button
     btnOrbital = uibutton(subGl, 'Text', 'Set Orbital Parameters');
     applyButtonStyle(btnOrbital)
-    btnOrbital.Layout.Row = 4;
+    btnOrbital.Layout.Row = 5;
     btnOrbital.Layout.Column = 3;
 
     % Attitude parameter button
     btnAttitude = uibutton(subGl, 'Text', 'Set Attitude Parameters');
     applyButtonStyle(btnAttitude)
-    btnAttitude.Layout.Row = 5;
+    btnAttitude.Layout.Row = 6;
     btnAttitude.Layout.Column = 3;
 
     % Environmental parameter button
     btnEnvironmental = uibutton(subGl, 'Text', 'Set Environmental Parameters');
     applyButtonStyle(btnEnvironmental)
-    btnEnvironmental.Layout.Row = 6;
+    btnEnvironmental.Layout.Row = 7;
     btnEnvironmental.Layout.Column = 3;
 
     % Controller parameter button
     btnController = uibutton(subGl, 'Text', 'Set Controller Parameters');
     applyButtonStyle(btnController)
-    btnController.Layout.Row = 7;
+    btnController.Layout.Row = 8;
     btnController.Layout.Column = 3;
     
     % Optional: Handle if user clicks the 'X' on window frame instead of Back
@@ -109,8 +116,62 @@ function openNewSimulation(mainFigHandle)
     %% Defining simulation structure in base workspace
     % This is where we initialize the structure that will hold all of our simulation parameters. We can update this structure as the user changes parameters in the GUI, and then use it to run the simulation when the user clicks "Run".
     simParams = struct();
+
+    % Initializing all defaults
     simParams.saved = false; % Flag to track if data has been saved
     simParams.named = false; % Flag to track if simulation has been named
+    simParams.fileName = 'My Simulation.mat'; % To store the file name if saved
+    simParams.filePath = './simulations/My Simulation.mat'; % To store the file path if saved
+    simParams.params = struct(); % This will hold all the actual simulation parameters (like time, orbital params, etc.) in a nested structure
+    simParams.params.Simulation = struct(...
+        'name', 'My Simulation', ...
+        'type', 'Nonlinear', ...
+        'initialTime', 0, ...
+        'finalTime', 1000, ...
+        'timeStep', 1, ...
+        'relTol', 1e-6, ...
+        'absTol', 1e-9 ...
+    );
+
+    simParams.params.Orbit = struct(...
+        'altitude', 400, ...
+        'semiMajorAxis', 400 + earthRadius/1000, ... % Convert altitude to semimajor axis
+        'eccentricity', 0, ...
+        'inclination', 0, ...
+        'argPeriapse', 0, ...
+        'RAAN', 0, ...
+        'trueAnomaly', 0 ...
+    );
+
+    simParams.params.Attitude = struct(...
+        'roll', 0, ...
+        'pitch', 0, ...
+        'yaw', 0, ...
+        'rollRate', 0, ...
+        'pitchRate', 0, ...
+        'yawRate', 0 ...
+    );
+
+    simParams.params.Environment = struct(...
+        'secondsOfDay', 0, ...
+        'dayOfYear', 1, ...
+        'F107Average', 65, ...
+        'F107Daily', 65, ...
+        'magneticIndices', [3, 3, 3, 3, 3, 3, 3], ...
+        'gasSurfaceInteractionModel', 'cook', ...
+        'accommodationCoefficient', 1, ...
+        'wallTemperature', 300, ...
+        'specularReflectivity', 0.15, ...
+        'diffuseReflectivity', 0.25, ...
+        'enableAnomalousOxygen', false, ...
+        'enableShadowAnalysis', true, ...
+        'enableSolarRadiationPressure', true ...
+    );
+
+    simParams.params.Controller = struct(...
+        'functionFile', 'myController.m' ...
+    );
+
     guidata(subFig, simParams); % Store in figure's guidata for access in callbacks
 
     %% Adding logic to buttons
@@ -118,10 +179,11 @@ function openNewSimulation(mainFigHandle)
     btnSave.ButtonPushedFcn = @(~,~) saveSimulationData();
     btnRun.ButtonPushedFcn = @(~,~) runSimulation(subFig);
     btnResults.ButtonPushedFcn = @(~,~) displayResults(subFig);
-    btnOrbital.ButtonPushedFcn = @(~,~) setOrbitalParameters(subFig);
-    btnAttitude.ButtonPushedFcn = @(~,~) setAttitudeParameters(subFig);
-    btnEnvironmental.ButtonPushedFcn = @(~,~) setEnvironmentalParameters(subFig);
-    btnController.ButtonPushedFcn = @(~,~) setControllerParameters(subFig);
+    btnSimParams.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Simulation Parameters');
+    btnOrbital.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Orbital Parameters');
+    btnAttitude.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Attitude Parameters');
+    btnEnvironmental.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Environmental Parameters');
+    btnController.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Controller Parameters');
 
     function saveSimulationData()
         disp('Saving simulation data...');
@@ -139,17 +201,26 @@ function openNewSimulation(mainFigHandle)
             simParams.saved = true; % Mark as saved
             guidata(subFig, simParams); % Update the guidata with the new saved status
 
+            % Checking if simulation name is passed in and updating title if so
+            simName = simParams.params.Simulation.name;
+            subFig.Name = ['New Simulation - ', simName]; % Update the window title to include the simulation name
+            lbl.Text = simName; % Update title label text
+
         else
             % If not saved and not named, prompt for file name
             % Open the save file dialog, defaulting to a .mat file
-            [file, path] = uiputfile('*.mat', 'Save Simulation Parameters');
+            % Defaulting to simulation name if it exists, otherwise default to "My Simulation.mat"
+            simulationsDirectory = './simulations/';
+            defaultFileName = [simParams.params.Simulation.name, '.mat'];
+
+            [file, path] = uiputfile([simulationsDirectory, defaultFileName], 'Save Simulation Parameters');
 
             % Check if the user selected a file or clicked Cancel
             if isequal(file, 0) || isequal(path, 0)
                 disp('User clicked Cancel');
             else
                 % Construct the full file path and save the data
-                fullFileName = fullfile(path, file);
+                fullFileName = fullfile(simulationsDirectory, file);
                 simParams.named = true; % Mark as named since we now have a file name
                 simParams.fileName = file; % Store the file name in simParams
                 simParams.saved = true; % Mark as saved
@@ -158,340 +229,32 @@ function openNewSimulation(mainFigHandle)
                 disp(['Data saved to: ', fullFileName]);
                 guidata(subFig, simParams); % Update the guidata with the new saved status
 
-                subFig.Name = ['New Simulation - ', file]; % Update the window title to include the file name
-                lbl.Text = ['New Simulation - ', file]; % Update title label text
+                % Checking if simulation name is passed in and updating title if so
+                simName = simParams.params.Simulation.name;
+                subFig.Name = ['New Simulation - ', simName]; % Update the window title to include the simulation name
+                lbl.Text = simName; % Update title label text
             end
         end
 
         assignin('base', 'simParams', simParams);
 
     end
-end
 
-function setOrbitalParameters(subFigHandle)
-    salmonColor = [1, 0.4941, 0.4392];
-
-    % Create the New Window
-    subFig = uifigure('Name', 'Set Orbital Parameters', ...
-                      'Position', [500, 300, 800, 450]);
-
-    % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
-
-    % Initializing grid layout
-    subGl = uigridlayout(subFig);
-    subGl.RowHeight = {
-        30,... 
-        '1x',...
-        30,...
-        30,...
-        30,...
-        30,...
-        30,...
-        30,...
-        '1x',...
-        30,...
-    };
-
-    subGl.ColumnWidth = {
-        'fit',...
-        100,...
-        75,...
-        'fit',...
-        '1x',...
-    };
-
-    % Add a Title to the Sub-Window (Center of content area)
-    lbl = uilabel(subGl, 'Text', 'Set Orbital Parameters');
-    lbl.FontName = 'Times New Roman';
-    lbl.FontSize = 20;
-    lbl.FontWeight = 'bold';
-    lbl.Layout.Row = 1;
-    lbl.Layout.Column = [1 5];
-    lbl.HorizontalAlignment = 'center';
-
-    %% Defining buttons
-    % Save and close button
-    btnSaveClose = uibutton(subGl, 'Text', 'Save and Close');
-    btnSaveClose.FontName = 'Times New Roman';
-    btnSaveClose.FontSize = 14;
-    btnSaveClose.Layout.Row = 10; % Bottom row
-    btnSaveClose.Layout.Column = 1; % Left column
-    btnSaveClose.BackgroundColor = salmonColor;
-
-    %% Defining entries
-    % Semimajor Axis
-    lblSMA = uilabel(subGl, 'Text', 'Semi-Major Axis (a) [m]');
-    lblSMA.FontName = 'Times New Roman';
-    lblSMA.FontSize = 14;
-    lblSMA.Layout.Row = 3;
-    lblSMA.Layout.Column = 4;
-    entrySMA = uieditfield(subGl, 'numeric');
-    entrySMA.FontName = 'Times New Roman';
-    entrySMA.FontSize = 14;
-    entrySMA.Layout.Row = 3;
-    entrySMA.Layout.Column = 3;
-    entrySMA.Value = 400e3; % Default to 400 km
-
-    % Eccentricity
-    lblEcc = uilabel(subGl, 'Text', 'Eccentricity (e)');
-    lblEcc.FontName = 'Times New Roman';
-    lblEcc.FontSize = 14;
-    lblEcc.Layout.Row = 4;
-    lblEcc.Layout.Column = 4;
-    entryEcc = uieditfield(subGl, 'numeric');
-    entryEcc.FontName = 'Times New Roman';
-    entryEcc.FontSize = 14;
-    entryEcc.Layout.Row = 4;
-    entryEcc.Layout.Column = 3;
-    entryEcc.Value = 0; % Default to 0
-
-    % Inclination
-    lblInc = uilabel(subGl, 'Text', 'Inclination (i) [deg]');
-    lblInc.FontName = 'Times New Roman';
-    lblInc.FontSize = 14;
-    lblInc.Layout.Row = 5;
-    lblInc.Layout.Column = 4;
-    entryInc = uieditfield(subGl, 'numeric');
-    entryInc.FontName = 'Times New Roman';
-    entryInc.FontSize = 14;
-    entryInc.Layout.Row = 5;
-    entryInc.Layout.Column = 3;
-    entryInc.Value = 0; % Default to 0
-
-    % Argument of periapse
-    lblAOP = uilabel(subGl, 'Text', 'Argument of periapse (ω) [deg]');
-    lblAOP.FontName = 'Times New Roman';
-    lblAOP.FontSize = 14;
-    lblAOP.Layout.Row = 6;
-    lblAOP.Layout.Column = 4;
-    entryAOP = uieditfield(subGl, 'numeric');
-    entryAOP.FontName = 'Times New Roman';
-    entryAOP.FontSize = 14;
-    entryAOP.Layout.Row = 6;
-    entryAOP.Layout.Column = 3;
-    entryAOP.Value = 0; % Default to 0
-
-    % Right Ascension of Ascending Node
-    lblRAAN = uilabel(subGl, 'Text', 'Right ascension of ascending node (Ω) [deg]');
-    lblRAAN.FontName = 'Times New Roman';
-    lblRAAN.FontSize = 14;
-    lblRAAN.Layout.Row = 7;
-    lblRAAN.Layout.Column = 4;
-    entryRAAN = uieditfield(subGl, 'numeric');
-    entryRAAN.FontName = 'Times New Roman';
-    entryRAAN.FontSize = 14;
-    entryRAAN.Layout.Row = 7;
-    entryRAAN.Layout.Column = 3;
-    entryRAAN.Value = 0; % Default to 0
-
-    % True anomaly
-    lblTA = uilabel(subGl, 'Text', 'True anomaly (ν) [deg]');
-    lblTA.FontName = 'Times New Roman';
-    lblTA.FontSize = 14;
-    lblTA.Layout.Row = 8;
-    lblTA.Layout.Column = 4;
-    entryTA = uieditfield(subGl, 'numeric');
-    entryTA.FontName = 'Times New Roman';
-    entryTA.FontSize = 14;
-    entryTA.Layout.Row = 8;
-    entryTA.Layout.Column = 3;
-    entryTA.Value = 0; % Default to 0
-
-    %% Saving logic
-    entryStruct = struct(...
-        'semiMajorAxis', entrySMA, ...
-        'eccentricity', entryEcc, ...
-        'inclination', entryInc, ...
-        'argPeriapse', entryAOP, ...
-        'RAAN', entryRAAN, ...
-        'trueAnomaly', entryTA ...
-    );
-
-    % Logic: Save all entries and close this window
-    btnSaveClose.ButtonPushedFcn = @(~,~) SaveClose();
-
-    function SaveClose()
-        % Retrieve simParams from figure's guidata
-        simParams = guidata(subFigHandle);
-
-        % Saving parameters to simParams structure
-        simParams.params.Orbital.semiMajorAxis = entryStruct.semiMajorAxis.Value;
-        simParams.params.Orbital.eccentricity = entryStruct.eccentricity.Value;
-        simParams.params.Orbital.inclination = entryStruct.inclination.Value;
-        simParams.params.Orbital.argPeriapse = entryStruct.argPeriapse.Value;
-        simParams.params.Orbital.RAAN = entryStruct.RAAN.Value;
-        simParams.params.Orbital.trueAnomaly = entryStruct.trueAnomaly.Value;
-
-        simParams.saved = false; % Mark as unsaved since parameters changed
-
-        % Update the guidata with the modified simParams
-        guidata(subFigHandle, simParams);
-
-        delete(subFig);
+    % Helper Function: The Back Logic
+    function goBack(currentFig, mainFig)
+        % If there are unsaved changes, prompt the user to confirm before going back
+        simParams = guidata(currentFig);
+        if isfield(simParams, 'saved') && ~simParams.saved
+            selection = uiconfirm(currentFig, 'You have unsaved changes. Are you sure you want to go back and lose these changes?', ...
+                'Unsaved Changes', ...
+                'Options', {'Yes', 'No'}, ...
+                'DefaultOption', 2);
+            if strcmp(selection, 'No')
+                return; % User chose not to go back, so exit the function
+            end
+        end
+        delete(currentFig);      % Destroy the sub-window
+        mainFig.Visible = 'on';  % Reveal the main menu
     end
-end
 
-function setAttitudeParameters(subFigHandle)
-    salmonColor = [1, 0.4941, 0.4392];
-    
-    % Create the New Window
-    subFig = uifigure('Name', 'Set Attitude Parameters', ...
-                      'Position', [500, 300, 800, 450]);
-
-    % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
-
-    % Initializing grid layout
-    subGl = uigridlayout(subFig);
-    subGl.RowHeight = {
-        30,... 
-        '1x',...
-        30,...
-        30,...
-        30,...
-        30,...
-        30,...
-        30,...
-        '1x',...
-        30,...
-    };
-
-    subGl.ColumnWidth = {
-        'fit',...
-        150,...
-        75,...
-        'fit',...
-        '1x',...
-    };
-
-    % Add a Title to the Sub-Window (Center of content area)
-    lbl = uilabel(subGl, 'Text', 'Set Attitude Parameters');
-    lbl.FontName = 'Times New Roman';
-    lbl.FontSize = 20;
-    lbl.FontWeight = 'bold';
-    lbl.Layout.Row = 1;
-    lbl.Layout.Column = [1 5];
-    lbl.HorizontalAlignment = 'center';
-
-    %% Defining buttons
-    % Save and close button
-    btnSaveClose = uibutton(subGl, 'Text', 'Save and Close');
-    btnSaveClose.FontName = 'Times New Roman';
-    btnSaveClose.FontSize = 14;
-    btnSaveClose.Layout.Row = 10; % Bottom row
-    btnSaveClose.Layout.Column = 1; % Left column
-    btnSaveClose.BackgroundColor = salmonColor;
-
-    %% Defining entries
-    % Roll
-    lblSMA = uilabel(subGl, 'Text', 'Roll ($\phi$) [deg]', 'Interpreter', 'latex');
-    lblSMA.FontName = 'Times New Roman';
-    lblSMA.FontSize = 14;
-    lblSMA.Layout.Row = 3;
-    lblSMA.Layout.Column = 4;
-    entrySMA = uieditfield(subGl, 'numeric');
-    entrySMA.FontName = 'Times New Roman';
-    entrySMA.FontSize = 14;
-    entrySMA.Layout.Row = 3;
-    entrySMA.Layout.Column = 3;
-    entrySMA.Value = 0; % Default to 0
-
-    % Pitch
-    lblEcc = uilabel(subGl, 'Text', 'Pitch ($\theta$) [deg]', 'Interpreter', 'latex');
-    lblEcc.FontName = 'Times New Roman';
-    lblEcc.FontSize = 14;
-    lblEcc.Layout.Row = 4;
-    lblEcc.Layout.Column = 4;
-    entryEcc = uieditfield(subGl, 'numeric');
-    entryEcc.FontName = 'Times New Roman';
-    entryEcc.FontSize = 14;
-    entryEcc.Layout.Row = 4;
-    entryEcc.Layout.Column = 3;
-    entryEcc.Value = 0; % Default to 0
-
-    % Yaw
-    lblInc = uilabel(subGl, 'Text', 'Yaw ($\psi$) [deg]', 'Interpreter', 'latex');
-    lblInc.FontName = 'Times New Roman';
-    lblInc.FontSize = 14;
-    lblInc.Layout.Row = 5;
-    lblInc.Layout.Column = 4;
-    entryInc = uieditfield(subGl, 'numeric');
-    entryInc.FontName = 'Times New Roman';
-    entryInc.FontSize = 14;
-    entryInc.Layout.Row = 5;
-    entryInc.Layout.Column = 3;
-    entryInc.Value = 0; % Default to 0
-
-    % Roll rate
-    lblAOP = uilabel(subGl, 'Text', 'Roll rate ($\dot{\phi}$) [deg/s]', 'Interpreter', 'latex');
-    lblAOP.FontName = 'Times New Roman';
-    lblAOP.FontSize = 14;
-    lblAOP.Layout.Row = 6;
-    lblAOP.Layout.Column = 4;
-    entryAOP = uieditfield(subGl, 'numeric');
-    entryAOP.FontName = 'Times New Roman';
-    entryAOP.FontSize = 14;
-    entryAOP.Layout.Row = 6;
-    entryAOP.Layout.Column = 3;
-    entryAOP.Value = 0; % Default to 0
-
-    % Pitch rate
-    lblRAAN = uilabel(subGl, 'Text', 'Pitch rate ($\dot{\theta}$) [deg/s]', 'Interpreter', 'latex');
-    lblRAAN.FontName = 'Times New Roman';
-    lblRAAN.FontSize = 14;
-    lblRAAN.Layout.Row = 7;
-    lblRAAN.Layout.Column = 4;
-    entryRAAN = uieditfield(subGl, 'numeric');
-    entryRAAN.FontName = 'Times New Roman';
-    entryRAAN.FontSize = 14;
-    entryRAAN.Layout.Row = 7;
-    entryRAAN.Layout.Column = 3;
-    entryRAAN.Value = 0; % Default to 0
-
-    % Yaw rate
-    lblTA = uilabel(subGl, 'Text', 'Yaw rate ($\dot{\psi}$) [deg/s]', 'Interpreter', 'latex');
-    lblTA.FontName = 'Times New Roman';
-    lblTA.FontSize = 14;
-    lblTA.Layout.Row = 8;
-    lblTA.Layout.Column = 4;
-    entryTA = uieditfield(subGl, 'numeric');
-    entryTA.FontName = 'Times New Roman';
-    entryTA.FontSize = 14;
-    entryTA.Layout.Row = 8;
-    entryTA.Layout.Column = 3;
-    entryTA.Value = 0; % Default to 0
-
-    %% Saving logic
-    entryStruct = struct(...
-        'roll', entrySMA, ...
-        'pitch', entryEcc, ...
-        'yaw', entryInc, ...
-        'rollRate', entryAOP, ...
-        'pitchRate', entryRAAN, ...
-        'yawRate', entryTA ...
-    );
-
-    % Logic: Save all entries and close this window
-    btnSaveClose.ButtonPushedFcn = @(~,~) SaveClose;
-
-    function SaveClose()
-        % Retrieve simParams from figure's guidata
-        simParams = guidata(subFigHandle);
-
-        % Saving parameters to simParams structure
-        simParams.params.Attitude.roll = entryStruct.roll.Value;
-        simParams.params.Attitude.pitch = entryStruct.pitch.Value;
-        simParams.params.Attitude.yaw = entryStruct.yaw.Value;
-        simParams.params.Attitude.rollRate = entryStruct.rollRate.Value;
-        simParams.params.Attitude.pitchRate = entryStruct.pitchRate.Value;
-        simParams.params.Attitude.yawRate = entryStruct.yawRate.Value;
-
-        simParams.saved = false; % Mark as unsaved since parameters changed
-
-        % Update the guidata with the modified simParams
-        guidata(subFigHandle, simParams);
-
-        delete(subFig);
-    end
 end
