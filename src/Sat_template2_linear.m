@@ -26,21 +26,15 @@ function Xd = Sat_template2_linear(t,X)
     %% Main computation
     % LC is initial torques
 
-    %initialization
+    %reference
     Xd = zeros(13,1);
-    x = X(1);
-    y = X(2);
-    z = X(3);
-    Vx = X(4);
-    Vy = X(5);
-    Vz = X(6);
-    q0 = X(7);
-    q1 = X(8);
-    q2 = X(9);
-    q3 = X(10);
-    wx = X(11);
-    wy = X(12);
-    wz = X(13);
+    q0 = 1;
+    q1 = 0;
+    q2 = 0;
+    q3 = 0;
+    wx = 0;
+    wy = 0;
+    wz = 0;
 
     % Constants
     mu = 3.986e14;
@@ -52,33 +46,21 @@ function Xd = Sat_template2_linear(t,X)
     
     % 2BP(states 1:6)
     Xd(1:3) = [1 0 0; 0 1 0; 0 0 1]*X(4:6);
-    
-    %Creating Jacobian for Velocities
-    J11 = (3*mu*x^2)/r^5 - mu/r^3;
-    J22 = (3*mu*y^2)/r^5 - mu/r^3;
-    J33 = (3*mu*z^2)/r^5 - mu/r^3;
-    J4to6 = [J11 0 0; 0 J22 0; 0 0 J33];
-    Xd(4:6) = J4to6*X(1:3);
-    
-    % quaternion kinematics (states 7:10) 
-    B = [q0 -q1 -q2 -q3; q1 q0 -q3 q2; q2 q3 q0 -q1; q3 -q2 q1 q0];
-    Xd(7:10) = .5*B*[0;wx;wy;wz];
+
+    % extra forces and perturbations can be added here
+    Xd(4:6) = -mu*X(1:3)/r^3;
 
     %calculating u
-    w_r = [0;0;0];
-    wdot_r = [0;0;0];
     P = [.15 0 0; 0 .15 0; 0 0 .15];
     Kp = [.0025 0 0 ; 0 .0025 0 ; 0 0 .0025];
-    delw = X(11:13) - w_r;
+    delw = X(11:13);
     u = -Kp * X(8:10);
     u = u- P * delw;
-    u = u + I * wdot_r;
-    u = u - cross(X(11:13),w_r);
+    %u = u + I * wdot_r;
+    %u = u - cross(X(11:13),w_r);
     % u = u + X(11:13)' * ICB * X(11:13)
-    % if abs(norm(u)) >= 1
-    %     disp("nonsense")
-    %     disp(norm(u))
-    % end
+    %u = [0 0 0]';
+
 
     %Creating Jacobian for Angular Velocities
     J11 = (-I(3,1)*wy + I(2,1)*wz)/I(1,1) + (-2*I(2,1)*wx + I(1,1)*wy - I(2,2)*wy -I(2,3)*wz)/I(1,3) + (2*I(3,1)*wx + I(3,2)*wy - I(1,1)*wz + I(3,3)*wz)/I(1,2);
@@ -91,14 +73,18 @@ function Xd = Sat_template2_linear(t,X)
     J32 = (I(3,2)*wx - I(1,2)*wz)/I(3,2) + (I(1,1)*wx - I(2,2)*wx + 2*I(1,2)*wy + I(1,2)*wz)/I(3,3) + (-I(3,1)*wx - 2*I(3,2)*wy +I(2,2)*wz - I(3,3)*wz)/I(3,1);
     J33 = (-I(2,3)*wx + I(1,3)*wy)/I(3,3)+ (-I(1,1)*wx + I(3,3)*wx - I(1,2)*wy - 2*I(1,3)*wz)/I(3,2) + (I(2,1)*wx + I(2,2)*wy - I(3,3)*wy + 2*I(2,3)*wz)/I(3,1);
 
-    J11to13X = [ J11 J12 J13;
-        J21 J22 J23;
-        J31 J32 J22];
-    J11to13U = [1/I(1,1) 0 0; 0 1/I(2,2) 0; 0 0 1/I(3,3)];
+    %Creating full jacobian for rotational dynamics
+    A = [ 0 -wx/2 -wy/2 wz/2 -q1/2 -q2/2 q3/2;
+        wx/2 0 wz/2 -wy/2 q0/2 -q3/2 q2/2;
+        wy/2 -wz/2 0 wx/2 q3/2 q0/2 -q1/2;
+        wz/2 wy/2 -wx/2 0 -q2/2 q1/2 q0/2;
+        0 0 0 0 J11 J12 J13;
+        0 0 0 0 J21 J22 J23;
+        0 0 0 0 J31 J32 J33];
 
+    B = [ zeros(4,3); inv(I)];
 
-    Xd(11:13) = J11to13X *X(11:13) + J11to13U*u;
-
+    Xd(7:13) = A*X(7:13) + B*u;
 
     % Add a controlling term, which u = K*X(11:13), where K the gain (need
     % to tune), can also add an integration term to reduce steady state
