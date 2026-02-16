@@ -1,14 +1,17 @@
-function RV = RVfromOE(orbit)
+function RV = RVfromOE(orbit, mu)
+arguments
+    orbit
+    mu double = 3.986004e14
+end
 
 %this function calculates the classical two-body orbital parameters 
 %using R and V vectors at one instant as input
-global mu_sun; global mu_earth; global mu;
-global mum;
-mu_sun = 132712440000.00002;
-mu_earth = 3.986004e14;
-erad = 6378.14e3;
-dtr = pi/180;
-mu = mu_earth;
+% global mu_sun; global mu_earth; global mu;
+% mu_sun = 132712440000.00002;
+% mu_earth = 3.986004e14;
+% erad = 6378.14e3;
+% dtr = pi/180;
+% mu = mu_earth;
 
 a = orbit(1);
 e = orbit(2);

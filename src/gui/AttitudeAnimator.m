@@ -1,12 +1,12 @@
-clear
-clc
-close all
+% clear
+% clc
+% close all
 
 %% Initializing video writer
 save = false;
 
 if save
-    v = VideoWriter(fullfile(fileparts(mfilename('fullpath')), '../../../assets/myAnimation.mp4'), 'MPEG-4');
+    v = VideoWriter(fullfile(fileparts(mfilename('fullpath')), '../../assets/YesControlNoAero.mp4'), 'MPEG-4');
     v.FrameRate = 30; % Set frame rate to 60 frames per second
     v.Quality = 75;   % Set video quality (0-100)
     open(v);
@@ -51,13 +51,13 @@ X_i = [r_i, v_i, beta_i, omega_i]';
 %% Simulating
 % Simualation bounds
 t0 = 0;
-t_span = 10*60; % 0.5 hour
+t_span = 30*60; % 0.5 hour
 dt = 1;
 
 ts = t0 : dt : t_span;
 
 opts = odeset('RelTol', 1e-12,'AbsTol', 1e-12);
-[t, X] = ode45(@Sat_template2_linear, ts, X_i, opts);
+[t, X] = ode45(@Sat_template, ts, X_i, opts);
 
 % Extract position and velocity from the state vector
 rs = X(:, 1:3);
@@ -79,7 +79,8 @@ set(fig, 'CloseRequestFcn', @myCloseRequestFunction);
 % reference and right is orientation of satellite
 t = tiledlayout(fig, 6, 2, TileSpacing="compact", Padding="compact");
 
-fig.WindowState = "maximized";
+% fig.WindowState = "maximized";
+set(fig, 'Position', [150, 150, 1280, 720]);
 
 %% Plotting position
 ax1 = nexttile(t, 1, [3, 1]);
@@ -156,7 +157,7 @@ o_2_text = text(o_2(1), o_2(2), o_2(3), 'o_2', 'color', 'r', Parent=ax2);
 o_3_text = text(o_3(1), o_3(2), o_3(3), 'o_3', 'color', 'r', Parent=ax2);
 
 % Reading in CubeSat model
-data = stlread(fullfile(fileparts(mfilename('fullpath')), './dynamics/6U CubeSat.STL'));
+data = stlread(fullfile(fileparts(mfilename('fullpath')), '../dynamics/6U CubeSat.STL'));
 triangle_mat = data.ConnectivityList;
 points = 2 * data.Points;
 
@@ -250,6 +251,9 @@ ylabel(ax3, "Angle [deg]")
 grid on
 
 range = abs(max([rolls; pitches; yaws]) - min([rolls; pitches; yaws]));
+if range == 0
+    range = 0.01;
+end
 ylim(ax3, [min([rolls; pitches; yaws]) - 0.1*range, max([rolls; pitches; yaws]) + 0.1*range])
 
 legend(ax3, [roll_marker, pitch_marker, yaw_marker], {"Roll \phi", "Pitch \theta", "Yaw \psi"}, Location="best")
@@ -278,6 +282,9 @@ ylabel(ax4, "Rotation Rate [deg/s]")
 grid on
 
 range = abs(max(omegas(:)) - min(omegas(:)));
+if range == 0
+    range = 0.01;
+end
 ylim(ax4, [min(omegas(:)) - 0.1*range, max(omegas(:)) + 0.1*range])
 
 legend(ax4, [roll_rate_marker, pitch_rate_marker, yaw_rate_marker], {"\omega_1", "\omega_2", "\omega_3"}, Location="best")
@@ -304,6 +311,9 @@ ylabel(ax5, "Torque [Nm]")
 grid on
 
 range = abs(max(torques(:)) - min(torques(:)));
+if range == 0
+    range = 0.01;
+end
 ylim(ax5, [min(torques(:)) - 0.1*range, max(torques(:)) + 0.1*range])
 
 legend(ax5, [tau_1_marker, tau_2_marker, tau_3_marker], {"\tau_1", "\tau_2", "\tau_3"}, Location="best")
@@ -414,7 +424,32 @@ for i = start : step_size : length(rs)
         drawnow;
         
         if save
-            frame = getframe(gcf); % Capture the current figure as a frame
+            % 2. Use 'fig' specific handle, not 'gcf'
+            frame = getframe(fig); 
+            
+            if isempty(frame.cdata)
+                return; % Skip if frame is empty (window minimized/closed)
+            end
+
+            % 3. Initialize target size on the very first frame
+            if i == start 
+                [h, w, ~] = size(frame.cdata);
+                
+                % Force dimensions to be even for MPEG-4
+                h = h - mod(h, 2);
+                w = w - mod(w, 2);
+                
+                % Store this "perfect" size for all future frames
+                targetSize = [h, w];
+                
+                % Crop the first frame
+                frame.cdata = frame.cdata(1:h, 1:w, :);
+            else
+                % 4. FORCE subsequent frames to match the first frame's size exactly
+                % This prevents "Frame must be X by Y" errors if the window shifts by 1px
+                frame.cdata = imresize(frame.cdata, targetSize);
+            end
+
             writeVideo(v, frame);  % Write the captured frame to the video object
         end
 

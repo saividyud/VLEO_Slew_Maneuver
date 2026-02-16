@@ -1,4 +1,4 @@
-function Xd = Sat_template(t,X)
+function Xd = sat_template_gui(t, X, subFigHandle)
 % Sat_template calculates the time rate of change of the state X at a time
 % t.
 %
@@ -8,50 +8,64 @@ function Xd = Sat_template(t,X)
 %   Time [s]
 % X : 13x1 vector
 %   State of the system with the following attributes:
-%       - Position (1:3)
-%       - Velocity (4:6)
+%       - Position (1:3) [km]
+%       - Velocity (4:6) [km/s]
 %       - Quaternion (7:10)
 %       - Angular velocity (11:13)
+% subFigHandle : figure handle
+%   Handle to the figure containing the simulation GUI, used to access
 %
 % Returns
 % -------
 % Xd : 13x1 vector
-%   Dotted state vector
+%   Dotted state vector [km/s, km/s^2, -, rad/s^2]
 
 % Xd and X are 13 dimensional state vectors
 % X has to be vertical for function to work
 % t is time(used for numerical integration)
 
     %% Satellite configuration (persistent to avoid reloading)
-    persistent objFilePath aeroOptions satMass
+    persistent objFilePath aeroOptions satMass ICB mu simParams day_start seconds_start
     if isempty(objFilePath)
+        % Reading in settings from GUI
+        simParams = guidata(subFigHandle);
+
         % Path to satellite mesh file (relative to this file's location)
         thisFilePath = fileparts(mfilename('fullpath'));
         objFilePath = fullfile(thisFilePath, 'dynamics', '6U CubeSat.obj');
         
         % Aerodynamic options
-        aeroOptions.f107Average = 150;      % 81-day average F10.7 flux
-        aeroOptions.f107Daily = 150;        % Daily F10.7 flux
-        aeroOptions.magneticIndex = ones(1,7)*3;
-        aeroOptions.anomalousOxygen = 0;
-        aeroOptions.gsi_model = 'cook';
-        aeroOptions.alpha = 1;              % Accommodation coefficient
-        aeroOptions.Tw = 300;               % Wall temperature [K]
-        aeroOptions.enableShadow = 1;
-        aeroOptions.enableSolar = 1;
-        aeroOptions.sol_cR = 0.15;          % Specular reflectivity
-        aeroOptions.sol_cD = 0.25;          % Diffuse reflectivity
+        aeroOptions.f107Average = simParams.initParams.Environment.F107Average;      % 81-day average F10.7 flux
+        aeroOptions.f107Daily = simParams.initParams.Environment.F107Daily;        % Daily F10.7 flux
+        aeroOptions.magneticIndex = simParams.initParams.Environment.magneticIndices;
+        aeroOptions.anomalousOxygen = simParams.initParams.Environment.enableAnomalousOxygen;
+        aeroOptions.gsi_model = simParams.initParams.Environment.gasSurfaceInteractionModel; % Gas-surface interaction model
+        aeroOptions.alpha = simParams.initParams.Environment.accommodationCoefficient;              % Accommodation coefficient
+        aeroOptions.Tw = simParams.initParams.Environment.wallTemperature;               % Wall temperature [K]
+        aeroOptions.enableShadow = simParams.initParams.Environment.enableShadowAnalysis;
+        aeroOptions.enableSolar = simParams.initParams.Environment.enableSolarRadiationPressure;
+        aeroOptions.sol_cR = simParams.initParams.Environment.specularReflectivity;          % Specular reflectivity
+        aeroOptions.sol_cD = simParams.initParams.Environment.diffuseReflectivity;          % Diffuse reflectivity
         
         satMass = 83;  % Satellite mass [kg]
+        
+        % Moment of inertia tensor
+        % Can start with approximating a sphere (think Sputnik)
+        ICB = 2/5*83*(.58/2)^2*[1 0 0 ; 0 1 0 ;0 0 1]; % [kg m^2]
+
+        % Earth gravitational parameter [m^3/s^2]
+        mu = simParams.initParams.Environment.mu;
+
+        % Days of year
+        day_start = simParams.initParams.Environment.dayOfYear;
+
+        % Seconds of day
+        seconds_start = simParams.initParams.Environment.secondsOfDay;
     end
-
-    
-
 
     %% Compute aerodynamic forces and moments
     % Constants
-    mu = 3.986e14;          % Earth gravitational parameter [m^3/s^2]
-    R_E = 6.37813649e6;     % Earth equatorial radius [m]
+    R_E = earthRadius;     % Earth equatorial radius [m]
     
     r = norm(X(1:3));       % Distance from Earth center [m]
     
@@ -96,8 +110,8 @@ function Xd = Sat_template(t,X)
     
     % Set up time structure (using simulation time)
     % Assuming simulation starts at day 106 (mid-April)
-    time.dayOfYear = 106 + floor(t / 86400);     % Day of year
-    time.UTseconds = mod(t, 86400);              % Seconds of the day
+    time.dayOfYear = day_start + floor((seconds_start + t)/86400);     % Day of year
+    time.UTseconds = seconds_start + mod(t, 86400);              % Seconds of the day
     
     % Compute aerodynamic forces and moments
     try
@@ -149,10 +163,6 @@ function Xd = Sat_template(t,X)
     
     % Perturbation functions
     a_J2 = J2(X);
-
-    % Moment of inertia tensor
-    % Can start with approximating a sphere (think Sputnik)
-    ICB = 2/5*83*(.58/2)^2*[1 0 0 ; 0 1 0 ;0 0 1]; % [kg m^2]
     
     % 2BP(states 1:6)
     Xd(1:3) = X(4:6);
@@ -165,14 +175,11 @@ function Xd = Sat_template(t,X)
     B = [X(7) -X(8) -X(9) -X(10); X(8) X(7) -X(10) X(9); X(9) X(10) X(7) -X(8); X(10) -X(9) X(8) X(7)];
     Xd(7:10) = .5*B*[0;X(11);X(12);X(13)];
 
-
     % Kinetics(states 11:13)
     % Includes: Control torques + Aerodynamic moments
-    LC = control_torques(t, X);
-    % LC = [0, 0, 0]';
+    LC = simParams.finalParams.Controller(t, X);
     
     % Total external torque (control + aerodynamic)
-    M_aero_body = [0, 0, 0]';
     L_total = LC + M_aero_body;
 
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11) 0];
