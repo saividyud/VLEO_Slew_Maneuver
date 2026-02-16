@@ -4,8 +4,8 @@ function AttitudeAnimatorGUI(mainFigHandle)
 
     save = false;
 
-    r_i = simParams.finalParams.rs(1, :);
-    v_i = simParams.finalParams.vs(1, :);
+    r_i = simParams.results.rs(1, :);
+    v_i = simParams.results.vs(1, :);
 
     b_1_i = v_i' / norm(v_i);
     b_3_i = -r_i' / norm(r_i);
@@ -19,14 +19,14 @@ function AttitudeAnimatorGUI(mainFigHandle)
     ];
 
     % Extract position and velocity from the state vector
-    rs = simParams.finalParams.rs;
-    vs = simParams.finalParams.vs;
-    betas = simParams.finalParams.betas;
-    omegas = simParams.finalParams.omegas;
-    ts = simParams.finalParams.t;
+    rs = simParams.results.rs;
+    vs = simParams.results.vs;
+    betas = simParams.results.betas;
+    omegas = simParams.results.omegas;
+    ts = simParams.results.t;
 
     % Extract torques
-    torques = simParams.finalParams.ControlTorques;
+    torques = simParams.results.torques;
 
     %% Reading plot
     fig = figure(Name="CubeSat");

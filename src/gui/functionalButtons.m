@@ -425,7 +425,7 @@ function setOrbitalParameters(subFigHandle)
     sliderAltitude = uislider(subGl);
     sliderAltitude.Layout.Row = 3;
     sliderAltitude.Layout.Column = 6;
-    sliderAltitude.Limits = [100e3, 1000e3]; % 100 km to 1,000 km
+    sliderAltitude.Limits = [100e3, 1000e3]; % 100,000 m to 1,000,000 m
     sliderAltitude.Value = simParams.initParams.Orbit.altitude; % Default to 400 km altitude
     sliderAltitude.MajorTicks = 100e3:300e3:1000e3; % Major ticks every 300 km
     sliderAltitude.MajorTickLabels = {'100 km', '400 km', '700 km', '1,000 km'};
@@ -599,7 +599,7 @@ function setOrbitalParameters(subFigHandle)
 
         % Saving parameters to simParams structure
         simParams.initParams.Orbit.altitude = entryStruct.altitude.Value;
-        simParams.initParams.Orbit.semiMajorAxis = entryStruct.altitude.Value + earthRadius/1000; % Convert altitude to semi-major axis [km]
+        simParams.initParams.Orbit.semiMajorAxis = entryStruct.altitude.Value + earthRadius; % Convert altitude to semi-major axis [m]
         simParams.initParams.Orbit.eccentricity = entryStruct.eccentricity.Value;
         simParams.initParams.Orbit.inclination = entryStruct.inclination.Value;
         simParams.initParams.Orbit.argPeriapse = entryStruct.argPeriapse.Value;

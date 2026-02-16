@@ -16,9 +16,8 @@ function runSimulation(subFigHandle)
     earthRadius = 6378.14e3; % Earth equatorial radius [m]
 
     %% Build initial orbital state
-    % simParams stores altitude and semiMajorAxis in km; RVfromOE needs
-    % meters, so convert.
-    a   = simParams.initParams.Orbit.semiMajorAxis * 1000; % [m]
+    % simParams stores altitude and semiMajorAxis in m
+    a   = simParams.initParams.Orbit.semiMajorAxis; % [m]
     e   = simParams.initParams.Orbit.eccentricity;
     inc = deg2rad(simParams.initParams.Orbit.inclination);
     raan = deg2rad(simParams.initParams.Orbit.RAAN);

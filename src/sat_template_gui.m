@@ -8,8 +8,8 @@ function Xd = sat_template_gui(t, X, subFigHandle)
 %   Time [s]
 % X : 13x1 vector
 %   State of the system with the following attributes:
-%       - Position (1:3) [km]
-%       - Velocity (4:6) [km/s]
+%       - Position (1:3) [m]
+%       - Velocity (4:6) [m/s]
 %       - Quaternion (7:10)
 %       - Angular velocity (11:13)
 % subFigHandle : figure handle
@@ -18,7 +18,7 @@ function Xd = sat_template_gui(t, X, subFigHandle)
 % Returns
 % -------
 % Xd : 13x1 vector
-%   Dotted state vector [km/s, km/s^2, -, rad/s^2]
+%   Dotted state vector [m/s, m/s^2, -, rad/s^2]
 
 % Xd and X are 13 dimensional state vectors
 % X has to be vertical for function to work
