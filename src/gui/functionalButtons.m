@@ -206,6 +206,7 @@ end
 
 function setOrbitalParameters(subFigHandle)
     salmonColor = [1, 0.4941, 0.4392];
+    earthRadius = 6378.14e3; % Earth equatorial radius [m]
 
     % Reading in simParams from guidata to pass into this function so we can update it with new values
     simParams = guidata(subFigHandle);
@@ -598,7 +599,7 @@ function setOrbitalParameters(subFigHandle)
 
         % Saving parameters to simParams structure
         simParams.params.Orbit.altitude = entryStruct.altitude.Value;
-        simParams.params.Orbit.semiMajorAxis = entryStruct.altitude.Value + earthRadius; % Convert altitude to semi-major axis
+        simParams.params.Orbit.semiMajorAxis = entryStruct.altitude.Value + earthRadius/1000; % Convert altitude to semi-major axis [km]
         simParams.params.Orbit.eccentricity = entryStruct.eccentricity.Value;
         simParams.params.Orbit.inclination = entryStruct.inclination.Value;
         simParams.params.Orbit.argPeriapse = entryStruct.argPeriapse.Value;
