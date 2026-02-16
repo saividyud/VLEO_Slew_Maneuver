@@ -13,6 +13,7 @@ if save
 end
 
 %% Initial state (in Keplerian orbital elements)
+earthRadius = 6378.14e3; % Earth equatorial radius [m]
 a = 250e3 + earthRadius; % 250 km above Earth semimajor axis
 e = 0; % Eccentricity
 i = 0; % Inclination

@@ -1,62 +1,129 @@
 function runSimulation(subFigHandle)
-    salmonColor = [1, 0.4941, 0.4392];
+% RUNSIMULATION Runs the satellite simulation using parameters stored in
+% the figure's guidata. Integrates the equations of motion using ode45 and
+% stores results back in guidata for later visualization.
+%
+% Parameters
+% ----------
+% subFigHandle : matlab.ui.Figure
+%   Handle to the simulation configuration figure (contains simParams in
+%   guidata)
 
-    % Reading in simParams from guidata to pass into this function so we can update it with new values
+    %% Extract simulation parameters
     simParams = guidata(subFigHandle);
 
-    % Extracting orbital parameters
-    a = simParams.initParams.Orbit.semiMajorAxis;
-    e = simParams.initParams.Orbit.eccentricity;
-    i = simParams.initParams.Orbit.inclination;
-    argPeriapse = simParams.initParams.Orbit.argPeriapse;
-    RAAN = simParams.initParams.Orbit.RAAN;
-    trueAnomaly = simParams.initParams.Orbit.trueAnomaly;
+    % Constants
+    earthRadius = 6378.14e3; % Earth equatorial radius [m]
 
-    orbit = [a, e, i, argPeriapse, RAAN, trueAnomaly];
+    %% Build initial orbital state
+    % simParams stores altitude and semiMajorAxis in km; RVfromOE needs
+    % meters, so convert.
+    a   = simParams.initParams.Orbit.semiMajorAxis * 1000; % [m]
+    e   = simParams.initParams.Orbit.eccentricity;
+    inc = deg2rad(simParams.initParams.Orbit.inclination);
+    raan = deg2rad(simParams.initParams.Orbit.RAAN);
+    aop  = deg2rad(simParams.initParams.Orbit.argPeriapse);
+    ta   = deg2rad(simParams.initParams.Orbit.trueAnomaly);
 
-    % Converting to state
-    RV = RVfromOE(orbit, simParams.initParams.Environment.mu);
-    r_i = RV(:, 1)'; % [km]
-    v_i = RV(:, 2)'; % [km/s]
+    orbit = [a, e, inc, raan, aop, ta];
 
-    % Extracting attitude parameters
-    beta_i = simParams.initParams.Attitude.Quaternion;
-    omega_i = [simParams.initParams.Attitude.rollRate, ...
-               simParams.initParams.Attitude.pitchRate, ...
-               simParams.initParams.Attitude.yawRate];
+    % Compute initial position and velocity in ECI frame
+    RV  = RVfromOE(orbit);
+    r_i = RV(:, 1)'; % [m]     1x3
+    v_i = RV(:, 2)'; % [m/s]   1x3
 
+    %% Compute initial quaternion
+    % Reference body frame aligned with orbit:
+    %   b1 = velocity direction, b3 = nadir (-r), b2 = completes triad
+    b1 = v_i' / norm(v_i);
+    b3 = -r_i' / norm(r_i);
+    b2 = cross(b3, b1);
+    b2 = b2 / norm(b2); % Ensure unit vector
+
+    R_BI_ref = [b1'; b2'; b3']; % Reference DCM  (body <- inertial)
+
+    % Apply user-specified Euler-angle offsets (ZYX: yaw-pitch-roll)
+    roll  = deg2rad(simParams.initParams.Attitude.roll);
+    pitch = deg2rad(simParams.initParams.Attitude.pitch);
+    yaw   = deg2rad(simParams.initParams.Attitude.yaw);
+
+    cr = cos(roll);  sr = sin(roll);
+    cp = cos(pitch); sp = sin(pitch);
+    cy = cos(yaw);   sy = sin(yaw);
+
+    R_offset = [cy*cp,  cy*sp*sr - sy*cr,  cy*sp*cr + sy*sr;
+                sy*cp,  sy*sp*sr + cy*cr,  sy*sp*cr - cy*sr;
+                  -sp,           cp*sr,              cp*cr];
+
+    R_BI_i = R_offset * R_BI_ref;
+    beta_i = QfromDCM(R_BI_i)'; % 1x4 quaternion [q0 q1 q2 q3]
+
+    % Initial angular velocity [rad/s]
+    omega_i = deg2rad([simParams.initParams.Attitude.rollRate, ...
+                       simParams.initParams.Attitude.pitchRate, ...
+                       simParams.initParams.Attitude.yawRate]);
+
+    %% Assemble initial state vector (13 x 1)
     X_i = [r_i, v_i, beta_i, omega_i]';
 
-    % Extracting simulation parameters
-    t_i = simParams.initParams.Simulation.initialTime;
-    t_f = simParams.initParams.Simulation.finalTime;
+    %% Simulation time vector
+    t0 = simParams.initParams.Simulation.initialTime;
+    tf = simParams.initParams.Simulation.finalTime;
     dt = simParams.initParams.Simulation.timeStep;
 
-    % simParams.finalParams will be populated after simulation runs
-    simParams.finalParams = struct();
+    ts = t0 : dt : tf;
 
-    ts = t_i : dt : t_f;
+    %% ODE options
+    opts = odeset('RelTol', simParams.initParams.Simulation.relTol, ...
+                  'AbsTol', simParams.initParams.Simulation.absTol);
 
-    % Running the simulation
-    opts = odeset('RelTol', simParams.initParams.Simulation.relTol, 'AbsTol', simParams.initParams.Simulation.absTol);
-    [t, X] = ode45(@(t, X) sat_template_gui(t, X, subFigHandle), ts, X_i, opts);
-
-    simParams.finalParams.X = X;
-    simParams.finalParams.t = t;
-
-    % Extracting torques from controller
-    torques = zeros(length(t), 3);
-    for idx = 1:length(t)
-        torques(idx, :) = simParams.initParams.Controller.Func(t(idx), X(idx, :)');
+    %% Select dynamics model
+    if strcmpi(simParams.initParams.Simulation.type, 'Nonlinear')
+        odeFun = @Sat_template;
+    else
+        odeFun = @Sat_template2_linear;
     end
 
-    simParams.finalParams.rs = X(:, 1:3);
-    simParams.finalParams.vs = X(:, 4:6);
-    simParams.finalParams.betas = X(:, 7:10);
-    simParams.finalParams.omegas = X(:, 11:13);
-    simParams.finalParams.ControlTorques = torques;
+    %% Run the integration with a progress dialog
+    d = uiprogressdlg(subFigHandle, ...
+        'Title', 'Running Simulation', ...
+        'Message', sprintf('Integrating %s equations of motion...', ...
+                           simParams.initParams.Simulation.type), ...
+        'Indeterminate', 'on');
 
-    guidata(subFigHandle, simParams); % Updating simParams in guidata to pass into sat_template_gui
-    assignin("base", "simParams", simParams); % Assigning simParams to base workspace for plotting
+    try
+        [t_out, X_out] = ode45(odeFun, ts, X_i, opts);
 
+        %% Package results
+        results        = struct();
+        results.t      = t_out;
+        results.X      = X_out;
+        results.rs     = X_out(:, 1:3);
+        results.vs     = X_out(:, 4:6);
+        results.betas  = X_out(:, 7:10);
+        results.omegas = X_out(:, 11:13);
+
+        % Compute control torques at each time step
+        nSteps = length(t_out);
+        torques = zeros(nSteps, 3);
+        for k = 1:nSteps
+            torques(k, :) = control_torques(t_out(k), X_out(k, :)')';
+        end
+        results.torques = torques;
+
+        % Store results in guidata
+        simParams.results = results;
+        guidata(subFigHandle, simParams);
+
+        close(d);
+        uialert(subFigHandle, ...
+            sprintf('Simulation completed successfully!\n%d time steps integrated.', nSteps), ...
+            'Success', 'Icon', 'success');
+
+    catch ME
+        close(d);
+        uialert(subFigHandle, ...
+            sprintf('Simulation failed:\n%s', ME.message), ...
+            'Error', 'Icon', 'error');
+    end
 end

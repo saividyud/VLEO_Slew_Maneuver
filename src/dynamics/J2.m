@@ -14,7 +14,7 @@ function [a_J23] = J2(X)
 
     % Defining constants
     mu = 3.986e14; % Gravitational parameter of Earth [m^3 / s^2]
-    R_e = earthRadius; % Average radius of the Earth [m]
+    R_e = 6378.14e3; % Average radius of the Earth [m]
     J2 = 1082e-6; % J2 zonal harmonic coefficient
     J3 = -2.53e-6; % J3 zonal harmonic coefficient
     
