@@ -1,4 +1,4 @@
-function Xd = Sat_template2_linear(t,X)
+function Xd = Sat_template2_linear(t,X,Xr,Xi)
 % Sat_template calculates the time rate of change of the state X at a time
 % t.
 %
@@ -28,13 +28,13 @@ function Xd = Sat_template2_linear(t,X)
 
     %reference
     Xd = zeros(13,1);
-    q0 = 1;
-    q1 = 0;
-    q2 = 0;
-    q3 = 0;
-    wx = 0;
-    wy = 0;
-    wz = 0;
+    q0 = Xr(1);
+    q1 = Xr(2);
+    q2 = Xr(3);
+    q3 = Xr(4);
+    wx = Xr(5);
+    wy = Xr(6);
+    wz = Xr(7);
 
     % Constants
     mu = 3.986e14;
@@ -49,18 +49,6 @@ function Xd = Sat_template2_linear(t,X)
 
     % extra forces and perturbations can be added here
     Xd(4:6) = -mu*X(1:3)/r^3;
-
-    %calculating u
-    P = [.15 0 0; 0 .15 0; 0 0 .15];
-    Kp = [.0025 0 0 ; 0 .0025 0 ; 0 0 .0025];
-    delw = X(11:13);
-    u = -Kp * X(8:10);
-    u = u- P * delw;
-    %u = u + I * wdot_r;
-    %u = u - cross(X(11:13),w_r);
-    % u = u + X(11:13)' * ICB * X(11:13)
-    %u = [0 0 0]';
-
 
     %Creating Jacobian for Angular Velocities
     J11 = (-I(3,1)*wy + I(2,1)*wz)/I(1,1) + (-2*I(2,1)*wx + I(1,1)*wy - I(2,2)*wy -I(2,3)*wz)/I(1,3) + (2*I(3,1)*wx + I(3,2)*wy - I(1,1)*wz + I(3,3)*wz)/I(1,2);
@@ -82,6 +70,24 @@ function Xd = Sat_template2_linear(t,X)
         0 0 0 0 J21 J22 J23;
         0 0 0 0 J31 J32 J33];
 
+    %Proportional Term
+    Kp = [.0025 0 0 ; 0 .0025 0 ; 0 0 .0025];
+    KpOm = [.1 0 0 ; 0 .1 0; 0 0 .1];
+    u = -Kp * X(8:10);
+    u = u - KpOm*X(11:13);
+
+    % if t > 1
+    %     %integral Term
+    %     Ki = .0001;
+    %     X = ode45(@(t,X) Sat_template2_linear(t,X,Xr,Xi),[0 t],Xi);
+    %     u = u - Ki* [sum(X(:,8)) sum(X(9,:)),sum(X(10,:))];
+    % end
+
+    %Derivative Term
+    Kd = .1;
+    Xd2 = A*X(7:13);
+    u = u - Kd*Xd2(2:4);
+    
     B = [ zeros(4,3); inv(I)];
 
     Xd(7:13) = A*X(7:13) + B*u;

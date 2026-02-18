@@ -1,6 +1,7 @@
 %Testing the sat template
-Xi = [0, 0, 6678e3, -7789, 0, 0, 0.5709415, 0.1675188, 0.5709415, 0.5656758,0,0,0]';
-[t,y] = ode45(@Sat_template2_linear,[0 1000],Xi);
+Xi = [0, 0, 6678e3, -7789, 0, 0,0.9961306, 0.0523491, 0.0473595, 0.0523491,0,0,0]';
+Xr = [1 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0];
+[t,y] = ode45(@(t,X) Sat_template2_linear(t,X,Xr,Xi),[0 1000],Xi);
 
 %quaternions to euler angles
 q0 = y(:,7);
