@@ -33,6 +33,7 @@ function LC = control_torques(t, X)
     % end
 
     LC = u;
+    % LC = [0, 0, 0]';
 
     % t_start = 2.5 * 60; % Start 5 minutes into simulation
     % duration = 5 * 60; % Lasts for 5 minutes

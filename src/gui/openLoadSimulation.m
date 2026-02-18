@@ -27,7 +27,7 @@ function openLoadSimulation(mainFigHandle)
     mainFigHandle.Visible = 'off';
 
     % Create the New Window
-    subFig = uifigure('Name', ['Loaded Simulation - ', simParams.params.Simulation.name], ...
+    subFig = uifigure('Name', ['Loaded Simulation - ', simParams.initParams.Simulation.name], ...
                       'Position', [500, 300, 800, 450]);
 
     % Define colors
@@ -59,7 +59,7 @@ function openLoadSimulation(mainFigHandle)
     };
 
     % Add a Title to the Sub-Window (Center of content area)
-    lbl = uilabel(subGl, 'Text', simParams.params.Simulation.name);
+    lbl = uilabel(subGl, 'Text', simParams.initParams.Simulation.name);
     lbl.FontName = 'Times New Roman';
     lbl.FontSize = 24;
     lbl.FontWeight = 'bold';
@@ -166,7 +166,7 @@ function openLoadSimulation(mainFigHandle)
             guidata(subFig, simParams); % Update the guidata with the new saved status
 
             % Checking if simulation name is passed in and updating title if so
-            simName = simParams.params.Simulation.name;
+            simName = simParams.initParams.Simulation.name;
             subFig.Name = ['Load Simulation - ', simName]; % Update the window title to include the simulation name
             lbl.Text = simName; % Update title label text
 
@@ -175,7 +175,7 @@ function openLoadSimulation(mainFigHandle)
             % Open the save file dialog, defaulting to a .mat file
             % Defaulting to simulation name if it exists, otherwise default to "My Simulation.mat"
             simulationsDirectory = './simulations/';
-            defaultFileName = [simParams.params.Simulation.name, '.mat'];
+            defaultFileName = [simParams.initParams.Simulation.name, '.mat'];
 
             [file, path] = uiputfile([simulationsDirectory, defaultFileName], 'Save Simulation Parameters');
 
@@ -194,7 +194,7 @@ function openLoadSimulation(mainFigHandle)
                 guidata(subFig, simParams); % Update the guidata with the new saved status
 
                 % Checking if simulation name is passed in and updating title if so
-                simName = simParams.params.Simulation.name;
+                simName = simParams.initParams.Simulation.name;
                 subFig.Name = ['Load Simulation - ', simName]; % Update the window title to include the simulation name
                 lbl.Text = simName; % Update title label text
             end

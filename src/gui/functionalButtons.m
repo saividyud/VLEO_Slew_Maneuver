@@ -26,7 +26,7 @@ function setSimulationParameters(subFigHandle)
                       'Position', [500, 300, 800, 450]);
 
     % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
+    % subFig.WindowStyle = 'modal';
 
     % Initializing grid layout
     subGl = uigridlayout(subFig);
@@ -82,7 +82,7 @@ function setSimulationParameters(subFigHandle)
     entryName.FontSize = 16;
     entryName.Layout.Row = 3;
     entryName.Layout.Column = 3;
-    entryName.Value = simParams.params.Simulation.name; % Default name
+    entryName.Value = simParams.initParams.Simulation.name; % Default name
 
     % Simulation type
     lblType = uilabel(subGl, 'Text', 'Simulation type');
@@ -96,7 +96,7 @@ function setSimulationParameters(subFigHandle)
     entryType.FontSize = 16;
     entryType.Layout.Row = 4;
     entryType.Layout.Column = 3;
-    entryType.Value = simParams.params.Simulation.type; % Default to Nonlinear
+    entryType.Value = simParams.initParams.Simulation.type; % Default to Nonlinear
 
     % Initial time
     lblTime = uilabel(subGl, 'Text', 'Initial time ($t_0$) [s]', 'Interpreter', 'latex');
@@ -109,7 +109,7 @@ function setSimulationParameters(subFigHandle)
     entryTime.FontSize = 14;
     entryTime.Layout.Row = 5;
     entryTime.Layout.Column = 3;
-    entryTime.Value = simParams.params.Simulation.initialTime; % Default to 0
+    entryTime.Value = simParams.initParams.Simulation.initialTime; % Default to 0
 
     % Final time
     lblFinalTime = uilabel(subGl, 'Text', 'Final time ($t_f$) [s]', 'Interpreter', 'latex');
@@ -122,7 +122,7 @@ function setSimulationParameters(subFigHandle)
     entryFinalTime.FontSize = 14;
     entryFinalTime.Layout.Row = 6;
     entryFinalTime.Layout.Column = 3;
-    entryFinalTime.Value = simParams.params.Simulation.finalTime; % Default to 1000 seconds
+    entryFinalTime.Value = simParams.initParams.Simulation.finalTime; % Default to 1000 seconds
 
     % Time step
     lblTimeStep = uilabel(subGl, 'Text', 'Time step ($\Delta t$) [s]', 'Interpreter', 'latex');
@@ -135,7 +135,7 @@ function setSimulationParameters(subFigHandle)
     entryTimeStep.FontSize = 14;
     entryTimeStep.Layout.Row = 7;
     entryTimeStep.Layout.Column = 3;
-    entryTimeStep.Value = simParams.params.Simulation.timeStep; % Default to 1 second
+    entryTimeStep.Value = simParams.initParams.Simulation.timeStep; % Default to 1 second
 
     % Relative tolerance
     lblRelTol = uilabel(subGl, 'Text', 'Relative tolerance ($\epsilon_{rel}$)', 'Interpreter', 'latex');
@@ -148,7 +148,7 @@ function setSimulationParameters(subFigHandle)
     entryRelTol.FontSize = 14;
     entryRelTol.Layout.Row = 8;
     entryRelTol.Layout.Column = 3;
-    entryRelTol.Value = simParams.params.Simulation.relTol; % Default to 1e-6
+    entryRelTol.Value = simParams.initParams.Simulation.relTol; % Default to 1e-6
 
     % Absolute tolerance
     lblAbsTol = uilabel(subGl, 'Text', 'Absolute tolerance ($\epsilon_{abs}$)', 'Interpreter', 'latex');
@@ -161,7 +161,7 @@ function setSimulationParameters(subFigHandle)
     entryAbsTol.FontSize = 14;
     entryAbsTol.Layout.Row = 9;
     entryAbsTol.Layout.Column = 3;
-    entryAbsTol.Value = simParams.params.Simulation.absTol; % Default to 1e-9
+    entryAbsTol.Value = simParams.initParams.Simulation.absTol; % Default to 1e-9
 
     %% Saving logic
     entryStruct = struct(...
@@ -182,18 +182,18 @@ function setSimulationParameters(subFigHandle)
         simParams = guidata(subFigHandle);
 
         % Saving parameters to simParams structure
-        simParams.params.Simulation.name = entryStruct.name.Value;
-        simParams.params.Simulation.type = entryStruct.type.Value;
-        simParams.params.Simulation.initialTime = entryStruct.initialTime.Value;
-        simParams.params.Simulation.finalTime = entryStruct.finalTime.Value;
-        simParams.params.Simulation.timeStep = entryStruct.timeStep.Value;
-        simParams.params.Simulation.relTol = entryStruct.relTol.Value;
-        simParams.params.Simulation.absTol = entryStruct.absTol.Value;
+        simParams.initParams.Simulation.name = entryStruct.name.Value;
+        simParams.initParams.Simulation.type = entryStruct.type.Value;
+        simParams.initParams.Simulation.initialTime = entryStruct.initialTime.Value;
+        simParams.initParams.Simulation.finalTime = entryStruct.finalTime.Value;
+        simParams.initParams.Simulation.timeStep = entryStruct.timeStep.Value;
+        simParams.initParams.Simulation.relTol = entryStruct.relTol.Value;
+        simParams.initParams.Simulation.absTol = entryStruct.absTol.Value;
 
         simParams.saved = false; % Mark as unsaved since parameters changed
 
         % Update main window title with asterisk to indicate unsaved changes
-        simName = simParams.params.Simulation.name;
+        simName = simParams.initParams.Simulation.name;
         subFigHandle.Name = [simName, ' *']; % Update the window title to include the simulation name and asterisk for unsaved changes
 
         % Update the guidata with the modified simParams
@@ -206,6 +206,7 @@ end
 
 function setOrbitalParameters(subFigHandle)
     salmonColor = [1, 0.4941, 0.4392];
+    earthRadius = 6378.14e3; % Earth equatorial radius [m]
 
     % Reading in simParams from guidata to pass into this function so we can update it with new values
     simParams = guidata(subFigHandle);
@@ -215,7 +216,7 @@ function setOrbitalParameters(subFigHandle)
                       'Position', [500, 300, 800, 450]);
 
     % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
+    % subFig.WindowStyle = 'modal';
 
     % Initializing grid layout
     subGl = uigridlayout(subFig);
@@ -265,9 +266,9 @@ function setOrbitalParameters(subFigHandle)
     ax = uiaxes(subGl);
     ax.Layout.Row = [3, 8];
     ax.Layout.Column = [1, 2];
-    ax.XLabel.String = 'X [km]';
-    ax.YLabel.String = 'Y [km]';
-    ax.ZLabel.String = 'Z [km]';
+    ax.XLabel.String = 'X';
+    ax.YLabel.String = 'Y';
+    ax.ZLabel.String = 'Z';
     ax.Title.String = 'Current Orbit';
     ax.Title.FontName = 'Times New Roman';
     ax.Title.FontSize = 14;
@@ -279,17 +280,17 @@ function setOrbitalParameters(subFigHandle)
     % Plotting Earth for reference
     % Defining Earth using WGS84 ellipsoid
     E = wgs84Ellipsoid;
-    [x,y,z] = ellipsoid(0, 0, 0, E.SemimajorAxis/1000, E.SemimajorAxis/1000, E.SemiminorAxis/1000, 50); % Scale to km and use 50 points for smoothness
+    [x,y,z] = ellipsoid(0, 0, 0, E.SemimajorAxis, E.SemimajorAxis, E.SemiminorAxis, 50); % Scale to m and use 50 points for smoothness
     surf(x, y, z, FaceAlpha="texturemap", FaceColor="texturemap", EdgeAlpha="texturemap", Parent=ax); % Plot the Earth
     hold(ax, "on");
 
     % Plotting current orbit
-    a = simParams.params.Orbit.semiMajorAxis; % km
-    e = simParams.params.Orbit.eccentricity;
-    i = deg2rad(simParams.params.Orbit.inclination); % Convert to radians
-    RAAN = deg2rad(simParams.params.Orbit.RAAN); % Convert to radians
-    AOP = deg2rad(simParams.params.Orbit.argPeriapse); % Convert to radians
-    nu = deg2rad(linspace(simParams.params.Orbit.trueAnomaly, simParams.params.Orbit.trueAnomaly + 360, 500)); % True anomaly from 0 to 360 degrees
+    a = simParams.initParams.Orbit.semiMajorAxis; % m
+    e = simParams.initParams.Orbit.eccentricity;
+    i = deg2rad(simParams.initParams.Orbit.inclination); % Convert to radians
+    RAAN = deg2rad(simParams.initParams.Orbit.RAAN); % Convert to radians
+    AOP = deg2rad(simParams.initParams.Orbit.argPeriapse); % Convert to radians
+    nu = deg2rad(linspace(simParams.initParams.Orbit.trueAnomaly, simParams.initParams.Orbit.trueAnomaly + 360, 500)); % True anomaly from 0 to 360 degrees
 
     % Construct orbit in orbital frame
     r = a * (1 - e^2) ./ (1 + e * cos(nu)); % Orbital radius
@@ -330,7 +331,7 @@ function setOrbitalParameters(subFigHandle)
 
     %% Defining entries
     % Altitude
-    lblAltitude = uilabel(subGl, 'Text', '$h$ [km]', 'Interpreter', 'latex');
+    lblAltitude = uilabel(subGl, 'Text', '$h$ [m]', 'Interpreter', 'latex');
     lblAltitude.FontName = 'Times New Roman';
     lblAltitude.FontSize = 14;
     lblAltitude.Layout.Row = 3;
@@ -340,9 +341,9 @@ function setOrbitalParameters(subFigHandle)
     entryAltitude.FontSize = 14;
     entryAltitude.Layout.Row = 3;
     entryAltitude.Layout.Column = 4;
-    entryAltitude.Tooltip = 'Altitude of the orbit (km)';
-    entryAltitude.Limits = [100, 1000]; % Limit altitude entry to 100 km to 1,000 km
-    entryAltitude.Value = simParams.params.Orbit.altitude; % Default to 400 km altitude
+    entryAltitude.Tooltip = 'Altitude of the orbit (m)';
+    entryAltitude.Limits = [100e3, 1000e3]; % Limit altitude entry to 100,000 m to 1,000,000 m
+    entryAltitude.Value = simParams.initParams.Orbit.altitude; % Default to 400,000 m altitude
 
     % Eccentricity
     lblEcc = uilabel(subGl, 'Text', '$e$', 'Interpreter', 'latex');
@@ -357,7 +358,7 @@ function setOrbitalParameters(subFigHandle)
     entryEcc.Layout.Column = 4;
     entryEcc.Tooltip = 'Eccentricity';
     entryEcc.Limits = [0, 0.9]; % Limit eccentricity entry to 0 to 0.9
-    entryEcc.Value = simParams.params.Orbit.eccentricity; % Default to 0
+    entryEcc.Value = simParams.initParams.Orbit.eccentricity; % Default to 0
 
     % Inclination
     lblInc = uilabel(subGl, 'Text', '$i$ [deg]', 'Interpreter', 'latex');
@@ -372,7 +373,7 @@ function setOrbitalParameters(subFigHandle)
     entryInc.Layout.Column = 4;
     entryInc.Tooltip = 'Inclination';
     entryInc.Limits = [0, 180]; % Limit inclination entry to 0 to 180 degrees
-    entryInc.Value = simParams.params.Orbit.inclination; % Default to 0
+    entryInc.Value = simParams.initParams.Orbit.inclination; % Default to 0
 
     % Argument of periapse
     lblAOP = uilabel(subGl, 'Text', '$\omega$ [deg]', 'Interpreter', 'latex');
@@ -387,7 +388,7 @@ function setOrbitalParameters(subFigHandle)
     entryAOP.Layout.Column = 4;
     entryAOP.Tooltip = 'Argument of periapse';
     entryAOP.Limits = [0, 360]; % Limit argument of periapse entry to 0 to 360 degrees
-    entryAOP.Value = simParams.params.Orbit.argPeriapse; % Default to 0
+    entryAOP.Value = simParams.initParams.Orbit.argPeriapse; % Default to 0
 
     % Right ascension of ascending node
     lblRAAN = uilabel(subGl, 'Text', '$\Omega$ [deg]', 'Interpreter', 'latex');
@@ -402,7 +403,7 @@ function setOrbitalParameters(subFigHandle)
     entryRAAN.Layout.Column = 4;
     entryRAAN.Tooltip = 'Right ascension of the ascending node';
     entryRAAN.Limits = [0, 360]; % Limit RAAN entry to 0 to 360 degrees
-    entryRAAN.Value = simParams.params.Orbit.RAAN; % Default to 0
+    entryRAAN.Value = simParams.initParams.Orbit.RAAN; % Default to 0
 
     % True anomaly
     lblTA = uilabel(subGl, 'Text', '$\nu$ [deg]', 'Interpreter', 'latex');
@@ -417,17 +418,17 @@ function setOrbitalParameters(subFigHandle)
     entryTA.Layout.Column = 4;
     entryTA.Tooltip = 'True anomaly';
     entryTA.Limits = [0, 360]; % Limit true anomaly entry to 0 to 360 degrees
-    entryTA.Value = simParams.params.Orbit.trueAnomaly; % Default to 0
+    entryTA.Value = simParams.initParams.Orbit.trueAnomaly; % Default to 0
 
     %% Defining sliders
     % Altitude slider
     sliderAltitude = uislider(subGl);
     sliderAltitude.Layout.Row = 3;
     sliderAltitude.Layout.Column = 6;
-    sliderAltitude.Limits = [100, 1000]; % 100 km to 1,000 km
-    sliderAltitude.Value = simParams.params.Orbit.altitude; % Default to 400 km altitude
-    sliderAltitude.MajorTicks = 100:300:1000; % Major ticks every 300 km
-    sliderAltitude.MajorTickLabels = {'100 km', '400 km', '700 km', '1000 km'};
+    sliderAltitude.Limits = [100e3, 1000e3]; % 100,000 m to 1,000,000 m
+    sliderAltitude.Value = simParams.initParams.Orbit.altitude; % Default to 400 km altitude
+    sliderAltitude.MajorTicks = 100e3:300e3:1000e3; % Major ticks every 300 km
+    sliderAltitude.MajorTickLabels = {'100 km', '400 km', '700 km', '1,000 km'};
     sliderAltitude.ValueChangingFcn = @(src, event) updateEntry(src, event, entryAltitude);
     entryAltitude.ValueChangedFcn = @(src, event) updateSlider(src, event, sliderAltitude);
 
@@ -436,7 +437,7 @@ function setOrbitalParameters(subFigHandle)
     sliderEcc.Layout.Row = 4;
     sliderEcc.Layout.Column = 6;
     sliderEcc.Limits = [0, 0.9]; % 0 to 0.9
-    sliderEcc.Value = simParams.params.Orbit.eccentricity; % Default to 0
+    sliderEcc.Value = simParams.initParams.Orbit.eccentricity; % Default to 0
     sliderEcc.MajorTicks = 0:0.3:0.9; % Major ticks every 0.3
     sliderEcc.MajorTickLabels = {'0', '0.3', '0.6', '0.9'};
     sliderEcc.ValueChangingFcn = @(src, event) updateEntry(src, event, entryEcc);
@@ -447,7 +448,7 @@ function setOrbitalParameters(subFigHandle)
     sliderInc.Layout.Row = 5;
     sliderInc.Layout.Column = 6;
     sliderInc.Limits = [0, 180]; % 0 to 180 degrees
-    sliderInc.Value = simParams.params.Orbit.inclination; % Default to 0
+    sliderInc.Value = simParams.initParams.Orbit.inclination; % Default to 0
     sliderInc.MajorTicks = 0:60:180; % Major ticks every 60 degrees
     sliderInc.MajorTickLabels = {'0°', '60°', '120°', '180°'};
     sliderInc.ValueChangingFcn = @(src, event) updateEntry(src, event, entryInc);
@@ -458,7 +459,7 @@ function setOrbitalParameters(subFigHandle)
     sliderAOP.Layout.Row = 6;
     sliderAOP.Layout.Column = 6;
     sliderAOP.Limits = [0, 360]; % 0 to 360 degrees
-    sliderAOP.Value = simParams.params.Orbit.argPeriapse; % Default to 0
+    sliderAOP.Value = simParams.initParams.Orbit.argPeriapse; % Default to 0
     sliderAOP.MajorTicks = 0:90:360; % Major ticks every 90 degrees
     sliderAOP.MajorTickLabels = {'0°', '90°', '180°', '270°', '360°'};
     sliderAOP.ValueChangingFcn = @(src, event) updateEntry(src, event, entryAOP);
@@ -469,7 +470,7 @@ function setOrbitalParameters(subFigHandle)
     sliderRAAN.Layout.Row = 7;
     sliderRAAN.Layout.Column = 6;
     sliderRAAN.Limits = [0, 360]; % 0 to 360 degrees
-    sliderRAAN.Value = simParams.params.Orbit.RAAN; % Default to 0
+    sliderRAAN.Value = simParams.initParams.Orbit.RAAN; % Default to 0
     sliderRAAN.MajorTicks = 0:90:360; % Major ticks every 90 degrees
     sliderRAAN.MajorTickLabels = {'0°', '90°', '180°', '270°', '360°'};
     sliderRAAN.ValueChangingFcn = @(src, event) updateEntry(src, event, entryRAAN);
@@ -480,7 +481,7 @@ function setOrbitalParameters(subFigHandle)
     sliderTA.Layout.Row = 8;
     sliderTA.Layout.Column = 6;
     sliderTA.Limits = [0, 360]; % 0 to 360 degrees
-    sliderTA.Value = simParams.params.Orbit.trueAnomaly; % Default to 0
+    sliderTA.Value = simParams.initParams.Orbit.trueAnomaly; % Default to 0
     sliderTA.MajorTicks = 0:90:360; % Major ticks every 90 degrees
     sliderTA.MajorTickLabels = {'0°', '90°', '180°', '270°', '360°'};
     sliderTA.ValueChangingFcn = @(src, event) updateEntry(src, event, entryTA);
@@ -491,7 +492,7 @@ function setOrbitalParameters(subFigHandle)
         entry.Value = value;
 
         % Update the orbit plot in real-time as parameters change
-        a = entryStruct.altitude.Value + earthRadius/1000; % Convert altitude to semi-major axis
+        a = entryStruct.altitude.Value + earthRadius; % Convert altitude to semi-major axis
         e = entryStruct.eccentricity.Value;
         i = deg2rad(entryStruct.inclination.Value); % Convert to radians
         RAAN = deg2rad(entryStruct.RAAN.Value); % Convert to radians
@@ -538,7 +539,7 @@ function setOrbitalParameters(subFigHandle)
         slider.Value = value;
 
         % Update the orbit plot in real-time as parameters change
-        a = entryStruct.altitude.Value + earthRadius/1000; % Convert altitude to semi-major axis
+        a = entryStruct.altitude.Value + earthRadius; % Convert altitude to semi-major axis
         e = entryStruct.eccentricity.Value;
         i = deg2rad(entryStruct.inclination.Value); % Convert to radians
         RAAN = deg2rad(entryStruct.RAAN.Value); % Convert to radians
@@ -597,18 +598,18 @@ function setOrbitalParameters(subFigHandle)
         simParams = guidata(subFigHandle);
 
         % Saving parameters to simParams structure
-        simParams.params.Orbit.altitude = entryStruct.altitude.Value;
-        simParams.params.Orbit.semiMajorAxis = entryStruct.altitude.Value + earthRadius; % Convert altitude to semi-major axis
-        simParams.params.Orbit.eccentricity = entryStruct.eccentricity.Value;
-        simParams.params.Orbit.inclination = entryStruct.inclination.Value;
-        simParams.params.Orbit.argPeriapse = entryStruct.argPeriapse.Value;
-        simParams.params.Orbit.RAAN = entryStruct.RAAN.Value;
-        simParams.params.Orbit.trueAnomaly = entryStruct.trueAnomaly.Value;
+        simParams.initParams.Orbit.altitude = entryStruct.altitude.Value;
+        simParams.initParams.Orbit.semiMajorAxis = entryStruct.altitude.Value + earthRadius; % Convert altitude to semi-major axis [m]
+        simParams.initParams.Orbit.eccentricity = entryStruct.eccentricity.Value;
+        simParams.initParams.Orbit.inclination = entryStruct.inclination.Value;
+        simParams.initParams.Orbit.argPeriapse = entryStruct.argPeriapse.Value;
+        simParams.initParams.Orbit.RAAN = entryStruct.RAAN.Value;
+        simParams.initParams.Orbit.trueAnomaly = entryStruct.trueAnomaly.Value;
 
         simParams.saved = false; % Mark as unsaved since parameters changed
 
         % Update main window title with asterisk to indicate unsaved changes
-        simName = simParams.params.Simulation.name;
+        simName = simParams.initParams.Simulation.name;
         subFigHandle.Name = [simName, ' *']; % Update the window title to include the simulation name and asterisk for unsaved changes
 
         % Update the guidata with the modified simParams
@@ -629,7 +630,7 @@ function setAttitudeParameters(subFigHandle)
                       'Position', [500, 300, 800, 450]);
 
     % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
+    % subFig.WindowStyle = 'modal';
 
     % Initializing grid layout
     subGl = uigridlayout(subFig);
@@ -704,12 +705,12 @@ function setAttitudeParameters(subFigHandle)
     [inertialArrows, inertialTexts] = draw_frame(inertialVectors, 'k', ax, 'i'); % Plot inertial frame in black
 
     % Plotting orbital axes
-    a = simParams.params.Orbit.semiMajorAxis; % km
-    e = simParams.params.Orbit.eccentricity;
-    i = deg2rad(simParams.params.Orbit.inclination); % Convert to radians
-    RAAN = deg2rad(simParams.params.Orbit.RAAN); % Convert to radians
-    AOP = deg2rad(simParams.params.Orbit.argPeriapse); % Convert to radians
-    nu = deg2rad(linspace(simParams.params.Orbit.trueAnomaly, simParams.params.Orbit.trueAnomaly + 360, 500)); % True anomaly from 0 to 360 degrees
+    a = simParams.initParams.Orbit.semiMajorAxis; % m
+    e = simParams.initParams.Orbit.eccentricity;
+    i = deg2rad(simParams.initParams.Orbit.inclination); % Convert to radians
+    RAAN = deg2rad(simParams.initParams.Orbit.RAAN); % Convert to radians
+    AOP = deg2rad(simParams.initParams.Orbit.argPeriapse); % Convert to radians
+    nu = deg2rad(linspace(simParams.initParams.Orbit.trueAnomaly, simParams.initParams.Orbit.trueAnomaly + 360, 500)); % True anomaly from 0 to 360 degrees
     
     % Creating transformation matrix from orbital frame to inertial frame (R_IO)
     R3_Omega = [cos(RAAN), -sin(RAAN), 0; 
@@ -740,9 +741,9 @@ function setAttitudeParameters(subFigHandle)
     R_Ref2I = [ref1, ref2, ref3];
 
     % Rotating into body frame using attitude angles (roll, pitch, yaw)
-    roll = deg2rad(simParams.params.Attitude.roll);
-    pitch = deg2rad(simParams.params.Attitude.pitch);
-    yaw = deg2rad(simParams.params.Attitude.yaw);
+    roll = deg2rad(simParams.initParams.Attitude.roll);
+    pitch = deg2rad(simParams.initParams.Attitude.pitch);
+    yaw = deg2rad(simParams.initParams.Attitude.yaw);
 
     % Rotation about Z (yaw)
     Rz_yaw = [cos(yaw), -sin(yaw), 0;
@@ -801,7 +802,7 @@ function setAttitudeParameters(subFigHandle)
     entryRoll.Layout.Column = 4;
     entryRoll.Tooltip = 'Roll angle';
     entryRoll.Limits = [-180, 180]; % Limit roll entry to -180 to 180 degrees
-    entryRoll.Value = simParams.params.Attitude.roll; % Default to 0
+    entryRoll.Value = simParams.initParams.Attitude.roll; % Default to 0
 
     % Pitch
     lblPitch = uilabel(subGl, 'Text', '$\theta$ [deg]', 'Interpreter', 'latex');
@@ -816,7 +817,7 @@ function setAttitudeParameters(subFigHandle)
     entryPitch.Layout.Column = 4;
     entryPitch.Tooltip = 'Pitch angle';
     entryPitch.Limits = [-180, 180]; % Limit pitch entry to -180 to 180 degrees
-    entryPitch.Value = simParams.params.Attitude.pitch; % Default to 0
+    entryPitch.Value = simParams.initParams.Attitude.pitch; % Default to 0
 
     % Yaw
     lblYaw = uilabel(subGl, 'Text', '$\psi$ [deg]', 'Interpreter', 'latex');
@@ -831,7 +832,7 @@ function setAttitudeParameters(subFigHandle)
     entryYaw.Layout.Column = 4;
     entryYaw.Tooltip = 'Yaw angle';
     entryYaw.Limits = [-180, 180]; % Limit yaw entry to -180 to 180 degrees
-    entryYaw.Value = simParams.params.Attitude.yaw; % Default to 0
+    entryYaw.Value = simParams.initParams.Attitude.yaw; % Default to 0
 
     % Roll rate
     lblRollRate = uilabel(subGl, 'Text', '$\dot{\phi}$ [deg/s]', 'Interpreter', 'latex');
@@ -846,7 +847,7 @@ function setAttitudeParameters(subFigHandle)
     entryRollRate.Layout.Column = 4;
     entryRollRate.Tooltip = 'Roll rate';
     entryRollRate.Limits = [-180, 180]; % Limit roll rate entry to -180 to 180 deg/s
-    entryRollRate.Value = simParams.params.Attitude.rollRate; % Default to 0
+    entryRollRate.Value = simParams.initParams.Attitude.rollRate; % Default to 0
 
     % Pitch rate
     lblPitchRate = uilabel(subGl, 'Text', '$\dot{\theta}$ [deg/s]', 'Interpreter', 'latex');
@@ -861,7 +862,7 @@ function setAttitudeParameters(subFigHandle)
     entryPitchRate.Layout.Column = 4;
     entryPitchRate.Tooltip = 'Pitch rate';
     entryPitchRate.Limits = [-180, 180]; % Limit pitch rate entry to -180 to 180 deg/s
-    entryPitchRate.Value = simParams.params.Attitude.pitchRate; % Default to 0
+    entryPitchRate.Value = simParams.initParams.Attitude.pitchRate; % Default to 0
 
     % Yaw rate
     lblYawRate = uilabel(subGl, 'Text', '$\dot{\psi}$ [deg/s]', 'Interpreter', 'latex');
@@ -876,7 +877,7 @@ function setAttitudeParameters(subFigHandle)
     entryYawRate.Layout.Column = 4;
     entryYawRate.Tooltip = 'Yaw rate';
     entryYawRate.Limits = [-180, 180]; % Limit yaw rate entry to -180 to 180 deg/s
-    entryYawRate.Value = simParams.params.Attitude.yawRate; % Default to 0
+    entryYawRate.Value = simParams.initParams.Attitude.yawRate; % Default to 0
 
     %% Defining sliders
     % Roll slider
@@ -884,7 +885,7 @@ function setAttitudeParameters(subFigHandle)
     sliderRoll.Layout.Row = 3;
     sliderRoll.Layout.Column = 6;
     sliderRoll.Limits = [-180, 180]; % -180 to 180 degrees
-    sliderRoll.Value = simParams.params.Attitude.roll; % Default to 0
+    sliderRoll.Value = simParams.initParams.Attitude.roll; % Default to 0
     sliderRoll.MajorTicks = -180:90:180; % Major ticks every 90 degrees
     sliderRoll.MajorTickLabels = {'-180°', '-90°', '0°', '90°', '180°'};
     sliderRoll.ValueChangingFcn = @(src, event) updateEntry(src, event, entryRoll, 'Roll');
@@ -895,7 +896,7 @@ function setAttitudeParameters(subFigHandle)
     sliderPitch.Layout.Row = 4;
     sliderPitch.Layout.Column = 6;
     sliderPitch.Limits = [-180, 180]; % -180 to 180 degrees
-    sliderPitch.Value = simParams.params.Attitude.pitch; % Default to 0
+    sliderPitch.Value = simParams.initParams.Attitude.pitch; % Default to 0
     sliderPitch.MajorTicks = -180:90:180; % Major ticks every 90 degrees
     sliderPitch.MajorTickLabels = {'-180°', '-90°', '0°', '90°', '180°'};
     sliderPitch.ValueChangingFcn = @(src, event) updateEntry(src, event, entryPitch, 'Pitch');
@@ -906,7 +907,7 @@ function setAttitudeParameters(subFigHandle)
     sliderYaw.Layout.Row = 5;
     sliderYaw.Layout.Column = 6;
     sliderYaw.Limits = [-180, 180]; % -180 to 180 degrees
-    sliderYaw.Value = simParams.params.Attitude.yaw; % Default to 0
+    sliderYaw.Value = simParams.initParams.Attitude.yaw; % Default to 0
     sliderYaw.MajorTicks = -180:90:180; % Major ticks every 90 degrees
     sliderYaw.MajorTickLabels = {'-180°', '-90°', '0°', '90°', '180°'};
     sliderYaw.ValueChangingFcn = @(src, event) updateEntry(src, event, entryYaw, 'Yaw');
@@ -917,7 +918,7 @@ function setAttitudeParameters(subFigHandle)
     sliderRollRate.Layout.Row = 6;
     sliderRollRate.Layout.Column = 6;
     sliderRollRate.Limits = [-180, 180]; % -180 to 180 deg/s
-    sliderRollRate.Value = simParams.params.Attitude.rollRate; % Default to 0
+    sliderRollRate.Value = simParams.initParams.Attitude.rollRate; % Default to 0
     sliderRollRate.MajorTicks = -180:90:180; % Major ticks every 90 deg/s
     sliderRollRate.MajorTickLabels = {'-180°/s', '-90°/s', '0°/s', '90°/s', '180°/s'};
     sliderRollRate.ValueChangingFcn = @(src, event) updateEntry(src, event, entryRollRate, 'RollRate');
@@ -928,7 +929,7 @@ function setAttitudeParameters(subFigHandle)
     sliderPitchRate.Layout.Row = 7;
     sliderPitchRate.Layout.Column = 6;
     sliderPitchRate.Limits = [-180, 180]; % -180 to 180 deg/s
-    sliderPitchRate.Value = simParams.params.Attitude.pitchRate; % Default to 0
+    sliderPitchRate.Value = simParams.initParams.Attitude.pitchRate; % Default to 0
     sliderPitchRate.MajorTicks = -180:90:180; % Major ticks every 90 deg/s
     sliderPitchRate.MajorTickLabels = {'-180°/s', '-90°/s', '0°/s', '90°/s', '180°/s'};
     sliderPitchRate.ValueChangingFcn = @(src, event) updateEntry(src, event, entryPitchRate, 'PitchRate');
@@ -939,7 +940,7 @@ function setAttitudeParameters(subFigHandle)
     sliderYawRate.Layout.Row = 8;
     sliderYawRate.Layout.Column = 6;
     sliderYawRate.Limits = [-180, 180]; % -180 to 180 deg/s
-    sliderYawRate.Value = simParams.params.Attitude.yawRate; % Default to 0
+    sliderYawRate.Value = simParams.initParams.Attitude.yawRate; % Default to 0
     sliderYawRate.MajorTicks = -180:90:180; % Major ticks every 90 deg/s
     sliderYawRate.MajorTickLabels = {'-180°/s', '-90°/s', '0°/s', '90°/s', '180°/s'};
     sliderYawRate.ValueChangingFcn = @(src, event) updateEntry(src, event, entryYawRate, 'YawRate');
@@ -1059,17 +1060,38 @@ function setAttitudeParameters(subFigHandle)
         simParams = guidata(subFigHandle);
 
         % Saving parameters to simParams structure
-        simParams.params.Attitude.roll = entryStruct.roll.Value;
-        simParams.params.Attitude.pitch = entryStruct.pitch.Value;
-        simParams.params.Attitude.yaw = entryStruct.yaw.Value;
-        simParams.params.Attitude.rollRate = entryStruct.rollRate.Value;
-        simParams.params.Attitude.pitchRate = entryStruct.pitchRate.Value;
-        simParams.params.Attitude.yawRate = entryStruct.yawRate.Value;
+        simParams.initParams.Attitude.roll = entryStruct.roll.Value;
+        simParams.initParams.Attitude.pitch = entryStruct.pitch.Value;
+        simParams.initParams.Attitude.yaw = entryStruct.yaw.Value;
+        simParams.initParams.Attitude.rollRate = entryStruct.rollRate.Value;
+        simParams.initParams.Attitude.pitchRate = entryStruct.pitchRate.Value;
+        simParams.initParams.Attitude.yawRate = entryStruct.yawRate.Value;
+
+        % Converting Euler angles to quaternions for internal use in dynamics calculations
+        % Euler angles encode the orientation between orbital frame and body frame, so must get DCM from body to inertial
+        Rz_yaw = [cosd(simParams.initParams.Attitude.yaw), -sind(simParams.initParams.Attitude.yaw), 0;
+                  sind(simParams.initParams.Attitude.yaw), cosd(simParams.initParams.Attitude.yaw), 0;
+                  0, 0, 1];
+
+        % Rotation about Y (pitch)
+        Ry_pitch = [cosd(simParams.initParams.Attitude.pitch), 0, sind(simParams.initParams.Attitude.pitch);
+                    0, 1, 0;
+                    -sind(simParams.initParams.Attitude.pitch), 0, cosd(simParams.initParams.Attitude.pitch)];
+
+        % Rotation about X (roll)
+        Rx_roll = [1, 0, 0;
+                   0, cosd(simParams.initParams.Attitude.roll), -sind(simParams.initParams.Attitude.roll);
+                   0, sind(simParams.initParams.Attitude.roll), cosd(simParams.initParams.Attitude.roll)];
+
+        R_B2Ref = Rz_yaw * Ry_pitch * Rx_roll; % Rotation from reference frame to body frame
+        R_IB = R_Ref2I * R_B2Ref; % Rotation from inertial frame to body frame
+
+        simParams.initParams.Attitude.Quaternion = dcm2quat(R_IB); % Convert DCM to quaternions
 
         simParams.saved = false; % Mark as unsaved since parameters changed
 
         % Update main window title with asterisk to indicate unsaved changes
-        simName = simParams.params.Simulation.name;
+        simName = simParams.initParams.Simulation.name;
         subFigHandle.Name = [simName, ' *']; % Update the window title to include the simulation name and asterisk for unsaved changes
 
         % Update the guidata with the modified simParams
@@ -1090,7 +1112,7 @@ function setEnvironmentalParameters(subFigHandle)
                       'Position', [500, 300, 800, 450]);
 
     % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
+    % subFig.WindowStyle = 'modal';
 
     % Initializing grid layout
     subGl = uigridlayout(subFig);
@@ -1161,7 +1183,7 @@ function setEnvironmentalParameters(subFigHandle)
     entrySOD.FontSize = 14;
     entrySOD.Layout.Row = 4;
     entrySOD.Layout.Column = 3;
-    entrySOD.Value = simParams.params.Environment.secondsOfDay; % Default to 0
+    entrySOD.Value = simParams.initParams.Environment.secondsOfDay; % Default to 0
 
     % Day of year
     lblDOY = uilabel(subGl, 'Text', 'Day of year');
@@ -1174,7 +1196,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryDOY.FontSize = 14;
     entryDOY.Layout.Row = 5;
     entryDOY.Layout.Column = 3;
-    entryDOY.Value = simParams.params.Environment.dayOfYear; % Default to 1
+    entryDOY.Value = simParams.initParams.Environment.dayOfYear; % Default to 1
 
     % 81-day average F10.7 solar flux
     lblF107 = uilabel(subGl, 'Text', '81-day average F10.7 solar flux');
@@ -1187,7 +1209,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryF107.FontSize = 14;
     entryF107.Layout.Row = 6;
     entryF107.Layout.Column = 3;
-    entryF107.Value = simParams.params.Environment.F107Average; % Default to 65
+    entryF107.Value = simParams.initParams.Environment.F107Average; % Default to 65
 
     % Daily F10.7 solar flux
     lblF107D = uilabel(subGl, 'Text', 'Daily F10.7 solar flux');
@@ -1200,7 +1222,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryF107D.FontSize = 14;
     entryF107D.Layout.Row = 7;
     entryF107D.Layout.Column = 3;
-    entryF107D.Value = simParams.params.Environment.F107Daily; % Default to 65
+    entryF107D.Value = simParams.initParams.Environment.F107Daily; % Default to 65
 
     % Magnetic indices
     % Dividing grid section into 7 columns 
@@ -1236,7 +1258,7 @@ function setEnvironmentalParameters(subFigHandle)
         entry.Tooltip = sprintf('Magnetic index %d', i); % Add tooltip for clarity
         entry.ValueDisplayFormat = '%.1f'; % Format to 1 decimal place
         entry.HorizontalAlignment = 'center'; % Center align the text for better aesthetics
-        entry.Value = simParams.params.Environment.magneticIndices(i); % Default to 0
+        entry.Value = simParams.initParams.Environment.magneticIndices(i); % Default to 0
         entryMags(i) = entry; % Store handle for later access
     end
 
@@ -1252,7 +1274,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryGSI.FontSize = 14;
     entryGSI.Layout.Row = 4;
     entryGSI.Layout.Column = 6;
-    entryGSI.Value = simParams.params.Environment.gasSurfaceInteractionModel; % Default to cook
+    entryGSI.Value = simParams.initParams.Environment.gasSurfaceInteractionModel; % Default to cook
 
     % Accommodation coefficient
     lblAccom = uilabel(subGl, 'Text', 'Accommodation coefficient');
@@ -1265,7 +1287,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryAccom.FontSize = 14;
     entryAccom.Layout.Row = 5;
     entryAccom.Layout.Column = 6;
-    entryAccom.Value = simParams.params.Environment.accommodationCoefficient; % Default to 1.0
+    entryAccom.Value = simParams.initParams.Environment.accommodationCoefficient; % Default to 1.0
 
     % Wall temperature
     lblTemp = uilabel(subGl, 'Text', 'Wall temperature [K]');
@@ -1278,7 +1300,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryTemp.FontSize = 14;
     entryTemp.Layout.Row = 6;
     entryTemp.Layout.Column = 6;
-    entryTemp.Value = simParams.params.Environment.wallTemperature; % Default to 300 K
+    entryTemp.Value = simParams.initParams.Environment.wallTemperature; % Default to 300 K
 
     % Specular reflectivity
     lblSpec = uilabel(subGl, 'Text', 'Specular reflectivity');
@@ -1291,7 +1313,7 @@ function setEnvironmentalParameters(subFigHandle)
     entrySpec.FontSize = 14;
     entrySpec.Layout.Row = 7;
     entrySpec.Layout.Column = 6;
-    entrySpec.Value = simParams.params.Environment.specularReflectivity; % Default to 0.15
+    entrySpec.Value = simParams.initParams.Environment.specularReflectivity; % Default to 0.15
 
     % Diffuse reflectivity
     lblDiff = uilabel(subGl, 'Text', 'Diffuse reflectivity');
@@ -1304,7 +1326,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryDiff.FontSize = 14;
     entryDiff.Layout.Row = 8;
     entryDiff.Layout.Column = 6;
-    entryDiff.Value = simParams.params.Environment.diffuseReflectivity; % Default to 0.25
+    entryDiff.Value = simParams.initParams.Environment.diffuseReflectivity; % Default to 0.25
 
     % Options
     lblOptions = uilabel(subGl, 'Text', 'Options:');
@@ -1326,7 +1348,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryAO.FontSize = 14;
     entryAO.Layout.Row = 11;
     entryAO.Layout.Column = 3;
-    if simParams.params.Environment.enableAnomalousOxygen == true
+    if simParams.initParams.Environment.enableAnomalousOxygen == true
         entryAO.Value = 'true'; % Default to false
     else
         entryAO.Value = 'false';
@@ -1344,7 +1366,7 @@ function setEnvironmentalParameters(subFigHandle)
     entryShadow.FontSize = 14;
     entryShadow.Layout.Row = 12;
     entryShadow.Layout.Column = 3;
-    if simParams.params.Environment.enableShadowAnalysis == true
+    if simParams.initParams.Environment.enableShadowAnalysis == true
         entryShadow.Value = 'true'; % Default to true
     else
         entryShadow.Value = 'false';
@@ -1362,7 +1384,7 @@ function setEnvironmentalParameters(subFigHandle)
     entrySRP.FontSize = 14;
     entrySRP.Layout.Row = 13;
     entrySRP.Layout.Column = 3;
-    if simParams.params.Environment.enableSolarRadiationPressure == true
+    if simParams.initParams.Environment.enableSolarRadiationPressure == true
         entrySRP.Value = 'true'; % Default to true
     else
         entrySRP.Value = 'false';
@@ -1393,19 +1415,19 @@ function setEnvironmentalParameters(subFigHandle)
         simParams = guidata(subFigHandle);
 
         % Saving parameters to simParams structure
-        simParams.params.Environment.secondsOfDay = entryStruct.secondsOfDay.Value;
-        simParams.params.Environment.dayOfYear = entryStruct.dayOfYear.Value;
-        simParams.params.Environment.F107Average = entryStruct.F107.Value;
-        simParams.params.Environment.F107Daily = entryStruct.F107D.Value;
-        simParams.params.Environment.magneticIndices = arrayfun(@(e) e.Value, entryStruct.magneticIndices);
-        simParams.params.Environment.gasSurfaceModel = entryStruct.gasSurfaceModel.Value;
-        simParams.params.Environment.accommodationCoefficient = entryStruct.accommodationCoefficient.Value;
-        simParams.params.Environment.wallTemperature = entryStruct.wallTemperature.Value;
-        simParams.params.Environment.specularReflectivity = entryStruct.specularReflectivity.Value;
-        simParams.params.Environment.diffuseReflectivity = entryStruct.diffuseReflectivity.Value;
-        simParams.params.Environment.enableAnomalousOxygen = strcmp(entryStruct.enableAnomalousOxygen.Value, 'true');
-        simParams.params.Environment.enableShadowAnalysis = strcmp(entryStruct.enableShadowAnalysis.Value, 'true');
-        simParams.params.Environment.enableSolarRadiationPressure = strcmp(entryStruct.enableSolarRadiationPressure.Value, 'true');
+        simParams.initParams.Environment.secondsOfDay = entryStruct.secondsOfDay.Value;
+        simParams.initParams.Environment.dayOfYear = entryStruct.dayOfYear.Value;
+        simParams.initParams.Environment.F107Average = entryStruct.F107.Value;
+        simParams.initParams.Environment.F107Daily = entryStruct.F107D.Value;
+        simParams.initParams.Environment.magneticIndices = arrayfun(@(e) e.Value, entryStruct.magneticIndices);
+        simParams.initParams.Environment.gasSurfaceModel = entryStruct.gasSurfaceModel.Value;
+        simParams.initParams.Environment.accommodationCoefficient = entryStruct.accommodationCoefficient.Value;
+        simParams.initParams.Environment.wallTemperature = entryStruct.wallTemperature.Value;
+        simParams.initParams.Environment.specularReflectivity = entryStruct.specularReflectivity.Value;
+        simParams.initParams.Environment.diffuseReflectivity = entryStruct.diffuseReflectivity.Value;
+        simParams.initParams.Environment.enableAnomalousOxygen = strcmp(entryStruct.enableAnomalousOxygen.Value, 'true');
+        simParams.initParams.Environment.enableShadowAnalysis = strcmp(entryStruct.enableShadowAnalysis.Value, 'true');
+        simParams.initParams.Environment.enableSolarRadiationPressure = strcmp(entryStruct.enableSolarRadiationPressure.Value, 'true');
 
         simParams.saved = false; % Mark as unsaved since parameters changed
 
@@ -1413,7 +1435,7 @@ function setEnvironmentalParameters(subFigHandle)
         guidata(subFigHandle, simParams);
 
         % Update main window title with asterisk to indicate unsaved changes
-        simName = simParams.params.Simulation.name;
+        simName = simParams.initParams.Simulation.name;
         subFigHandle.Name = ['New Simulation - ', simName, ' *']; % Update the window title to include the simulation name and asterisk for unsaved changes
 
         delete(subFig);
@@ -1432,7 +1454,7 @@ function setControllerParameters(subFigHandle)
                       'Position', [500, 300, 800, 450]);
 
     % Prevent users from clicking out of figure
-    subFig.WindowStyle = 'modal';
+    % subFig.WindowStyle = 'modal';
 
     % Initializing grid layout
     subGl = uigridlayout(subFig);
@@ -1486,7 +1508,7 @@ function setControllerParameters(subFigHandle)
     entryFunc.FontSize = 14;
     entryFunc.Layout.Row = 3;
     entryFunc.Layout.Column = 3;
-    entryFunc.Value = simParams.params.Controller.functionFile; % Default to a function file
+    entryFunc.Value = simParams.initParams.Controller.functionFile; % Default to a function file
     btnBrowse = uibutton(subGl, 'Text', 'Browse');
     btnBrowse.FontName = 'Times New Roman';
     btnBrowse.FontSize = 14;
@@ -1516,12 +1538,18 @@ function setControllerParameters(subFigHandle)
         simParams = guidata(subFigHandle);
 
         % Saving parameters to simParams structure
-        simParams.params.Controller.functionFile = entryStruct.functionFile.Value;
+        simParams.initParams.Controller.functionFile = entryStruct.functionFile.Value;
+
+        % Creating function handle for controller
+        funcFile = simParams.initParams.Controller.functionFile(1:end-2); % Removing .m extension
+        arr = split(funcFile, '/');
+        funcFile = arr{end}; % Get just the file name without path
+        simParams.initParams.Controller.Func = str2func(funcFile);
 
         simParams.saved = false; % Mark as unsaved since parameters changed
 
         % Update main window title with asterisk to indicate unsaved changes
-        simName = simParams.params.Simulation.name;
+        simName = simParams.initParams.Simulation.name;
         subFigHandle.Name = ['New Simulation - ', simName, ' *']; % Update the window title to include the simulation name and asterisk for unsaved changes
 
         % Update the guidata with the modified simParams

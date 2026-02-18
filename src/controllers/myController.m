@@ -1,4 +1,4 @@
-function tau = testController(t, X)
+function tau = myController(t, X)
 % testController calculates the torques on the satellite
 % given the time and state.
 %
