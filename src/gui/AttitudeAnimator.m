@@ -319,6 +319,9 @@ ylim(ax5, [min(torques(:)) - 0.1*range, max(torques(:)) + 0.1*range])
 
 legend(ax5, [tau_1_marker, tau_2_marker, tau_3_marker], {"\tau_1", "\tau_2", "\tau_3"}, Location="best")
 
+% Make all text in the figure much larger for readability
+set(findall(fig, '-property', 'FontSize'), 'FontSize', 24)
+
 %% Animating
 start = 1;
 step_size = 5;

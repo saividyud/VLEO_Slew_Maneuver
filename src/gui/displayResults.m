@@ -25,6 +25,11 @@ function displayResults(subFigHandle)
     betas   = results.betas;
     omegas  = results.omegas;
     torques = results.torques;
+    if isfield(results, 'aeroTorques')
+        aeroTorques = results.aeroTorques;
+    else
+        aeroTorques = zeros(size(torques));
+    end
 
     %% Convert time to minutes for plotting
     t_min = t / 60;
@@ -47,7 +52,7 @@ function displayResults(subFigHandle)
     omegas_deg = rad2deg(omegas);
 
     %% Create results figure
-    simName = simParams.params.Simulation.name;
+    simName = simParams.initParams.Simulation.name;
     fig = figure('Name', ['Results - ' simName], ...
                  'NumberTitle', 'off');
     fig.WindowState = 'maximized';
@@ -88,11 +93,14 @@ function displayResults(subFigHandle)
     plot(ax3, t_min, torques(:, 1), 'r', 'LineWidth', 1.2);
     plot(ax3, t_min, torques(:, 2), 'b', 'LineWidth', 1.2);
     plot(ax3, t_min, torques(:, 3), 'k', 'LineWidth', 1.2);
+    plot(ax3, t_min, aeroTorques(:, 1), 'r--', 'LineWidth', 1.0);
+    plot(ax3, t_min, aeroTorques(:, 2), 'b--', 'LineWidth', 1.0);
+    plot(ax3, t_min, aeroTorques(:, 3), 'k--', 'LineWidth', 1.0);
     hold(ax3, 'off');
     xlabel(ax3, 'Time [min]');
     ylabel(ax3, 'Torque [N m]');
-    title(ax3, 'Control Torques');
-    legend(ax3, {'\tau_1', '\tau_2', '\tau_3'}, 'Location', 'best');
+    title(ax3, 'Control (solid) and Aero (dashed) Torques');
+    legend(ax3, {'\tau_{c,1}', '\tau_{c,2}', '\tau_{c,3}', '\tau_{a,1}', '\tau_{a,2}', '\tau_{a,3}'}, 'Location', 'best');
     grid(ax3, 'on');
 
     %% Panel 4: Orbital Trajectory

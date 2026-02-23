@@ -172,7 +172,6 @@ function Xd = Sat_template(t,X)
     % LC = [0, 0, 0]';
     
     % Total external torque (control + aerodynamic)
-    M_aero_body = [0, 0, 0]';
     L_total = LC + M_aero_body;
 
     WX = [0 -X(13) X(12); X(13) 0 -X(11); -X(12) X(11) 0];

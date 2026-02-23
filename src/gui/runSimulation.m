@@ -11,9 +11,8 @@ function runSimulation(subFigHandle)
 
     %% Extract simulation parameters
     simParams = guidata(subFigHandle);
-
-    % Constants
-    earthRadius = 6378.14e3; % Earth equatorial radius [m]
+    simParams = ensureSimulationDefaults(simParams);
+    guidata(subFigHandle, simParams);
 
     %% Build initial orbital state
     % simParams stores altitude and semiMajorAxis in m
@@ -77,10 +76,12 @@ function runSimulation(subFigHandle)
                   'AbsTol', simParams.initParams.Simulation.absTol);
 
     %% Select dynamics model
-    if strcmpi(simParams.initParams.Simulation.type, 'Nonlinear')
-        odeFun = @Sat_template;
+    isNonlinear = strcmpi(simParams.initParams.Simulation.type, 'Nonlinear');
+    if isNonlinear
+        odeFun = @(t, X) sat_template_gui(t, X, subFigHandle);
     else
-        odeFun = @Sat_template2_linear;
+        Xr = [1; 0; 0; 0; 0; 0; 0];
+        odeFun = @(t, X) Sat_template2_linear(t, X, Xr, X_i);
     end
 
     %% Run the integration with a progress dialog
@@ -102,27 +103,275 @@ function runSimulation(subFigHandle)
         results.betas  = X_out(:, 7:10);
         results.omegas = X_out(:, 11:13);
 
-        % Compute control torques at each time step
+        % Compute torque breakdown at each time step
         nSteps = length(t_out);
         torques = zeros(nSteps, 3);
+        aeroTorques = zeros(nSteps, 3);
+        totalTorques = zeros(nSteps, 3);
+
         for k = 1:nSteps
-            torques(k, :) = control_torques(t_out(k), X_out(k, :)')';
+            tau = evaluateControlTorque(simParams, t_out(k), X_out(k, :)');
+            if isNonlinear
+                tauAero = evaluateAeroTorque(simParams, t_out(k), X_out(k, :)');
+            else
+                tauAero = [0; 0; 0];
+            end
+
+            torques(k, :) = tau';
+            aeroTorques(k, :) = tauAero';
+            totalTorques(k, :) = (tau + tauAero)';
         end
+
         results.torques = torques;
+        results.aeroTorques = aeroTorques;
+        results.totalTorques = totalTorques;
+        results.maxAeroTorqueNorm = max(sqrt(sum(aeroTorques.^2, 2)));
+
+        csvPath = saveTorqueBreakdownCsv(simParams, t_out, torques, aeroTorques, totalTorques);
+        results.torqueCsvPath = csvPath;
 
         % Store results in guidata
         simParams.results = results;
         guidata(subFigHandle, simParams);
 
         close(d);
-        uialert(subFigHandle, ...
-            sprintf('Simulation completed successfully!\n%d time steps integrated.', nSteps), ...
-            'Success', 'Icon', 'success');
+        if isempty(csvPath)
+            successMsg = sprintf('Simulation completed successfully!\n%d time steps integrated.\nMax |tau_aero| = %.3e N m\nTorque breakdown CSV could not be saved.', nSteps, results.maxAeroTorqueNorm);
+        else
+            [~, csvName, csvExt] = fileparts(csvPath);
+            successMsg = sprintf('Simulation completed successfully!\n%d time steps integrated.\nMax |tau_aero| = %.3e N m\nTorque breakdown saved to simulations/%s%s', nSteps, results.maxAeroTorqueNorm, csvName, csvExt);
+        end
+
+        uialert(subFigHandle, successMsg, 'Success', 'Icon', 'success');
 
     catch ME
         close(d);
         uialert(subFigHandle, ...
             sprintf('Simulation failed:\n%s', ME.message), ...
             'Error', 'Icon', 'error');
+    end
+end
+
+function simParams = ensureSimulationDefaults(simParams)
+    if ~isfield(simParams, 'initParams')
+        simParams.initParams = struct();
+    end
+
+    if ~isfield(simParams.initParams, 'Modes')
+        simParams.initParams.Modes = struct();
+    end
+
+    if ~isfield(simParams.initParams.Modes, 'enableAero')
+        simParams.initParams.Modes.enableAero = true;
+    end
+
+    if ~isfield(simParams.initParams.Modes, 'enableControl')
+        simParams.initParams.Modes.enableControl = true;
+    end
+
+    if ~isfield(simParams.initParams, 'Environment')
+        simParams.initParams.Environment = struct();
+    end
+
+    if ~isfield(simParams.initParams.Environment, 'gasSurfaceInteractionModel') && ...
+            isfield(simParams.initParams.Environment, 'gasSurfaceModel')
+        simParams.initParams.Environment.gasSurfaceInteractionModel = ...
+            simParams.initParams.Environment.gasSurfaceModel;
+    end
+
+    if ~isfield(simParams.initParams.Environment, 'gasSurfaceInteractionModel')
+        simParams.initParams.Environment.gasSurfaceInteractionModel = 'cook';
+    end
+
+    if ~isfield(simParams.initParams, 'Controller')
+        simParams.initParams.Controller = struct();
+    end
+
+    if ~isfield(simParams.initParams.Controller, 'functionFile') || ...
+            isempty(simParams.initParams.Controller.functionFile)
+        simParams.initParams.Controller.functionFile = 'control_torques.m';
+    end
+
+    if ~isfield(simParams.initParams.Controller, 'Func') || ...
+            ~isa(simParams.initParams.Controller.Func, 'function_handle')
+        [~, funcName, ~] = fileparts(simParams.initParams.Controller.functionFile);
+        simParams.initParams.Controller.Func = str2func(funcName);
+    end
+end
+
+function tau = evaluateControlTorque(simParams, t, X)
+    tau = [0; 0; 0];
+
+    if ~getModeFlag(simParams, 'enableControl', true)
+        return;
+    end
+
+    if ~isfield(simParams, 'initParams') || ~isfield(simParams.initParams, 'Controller')
+        return;
+    end
+
+    controller = simParams.initParams.Controller;
+    controllerFunc = [];
+
+    if isfield(controller, 'Func') && isa(controller.Func, 'function_handle')
+        controllerFunc = controller.Func;
+    elseif isfield(controller, 'functionFile') && ~isempty(controller.functionFile)
+        [~, funcName, ~] = fileparts(controller.functionFile);
+        controllerFunc = str2func(funcName);
+    end
+
+    if isempty(controllerFunc)
+        return;
+    end
+
+    try
+        tauCandidate = controllerFunc(t, X);
+        tauCandidate = reshape(tauCandidate, [], 1);
+        if numel(tauCandidate) == 3 && all(isfinite(tauCandidate))
+            tau = tauCandidate;
+        end
+    catch
+        tau = [0; 0; 0];
+    end
+end
+
+function tauAero = evaluateAeroTorque(simParams, t, X)
+    tauAero = [0; 0; 0];
+
+    if ~getModeFlag(simParams, 'enableAero', true)
+        return;
+    end
+
+    r = norm(X(1:3));
+    if ~(isfinite(r) && r > 0)
+        return;
+    end
+
+    thisFilePath = fileparts(mfilename('fullpath'));
+    objFilePath = fullfile(thisFilePath, '..', 'dynamics', '6U CubeSat.obj');
+
+    location.altitude = r - 6378.14e3;
+    location.latitude = asind(X(3) / r);
+    location.longitude = atan2d(X(2), X(1));
+
+    q = X(7:10);
+    v_eci = X(4:6);
+
+    q0 = q(1);
+    q1 = q(2);
+    q2 = q(3);
+    q3 = q(4);
+    R_eci2body = [1-2*(q2^2+q3^2), 2*(q1*q2+q0*q3), 2*(q1*q3-q0*q2);
+                  2*(q1*q2-q0*q3), 1-2*(q1^2+q3^2), 2*(q2*q3+q0*q1);
+                  2*(q1*q3+q0*q2), 2*(q2*q3-q0*q1), 1-2*(q1^2+q2^2)];
+
+    v_body = R_eci2body * v_eci;
+    v_mag = norm(v_body);
+    if v_mag > 1
+        attitude.aoa = atan2d(v_body(3), v_body(1));
+        attitude.aos = atan2d(v_body(2), v_body(1));
+    else
+        attitude.aoa = 0;
+        attitude.aos = 0;
+    end
+
+    day_start = getEnvValue(simParams, 'dayOfYear', 1);
+    seconds_start = getEnvValue(simParams, 'secondsOfDay', 0);
+    time.dayOfYear = day_start + floor((seconds_start + t) / 86400);
+    time.UTseconds = mod(seconds_start + t, 86400);
+
+    aeroOptions.f107Average = getEnvValue(simParams, 'F107Average', 150);
+    aeroOptions.f107Daily = getEnvValue(simParams, 'F107Daily', 150);
+    aeroOptions.magneticIndex = getEnvValue(simParams, 'magneticIndices', ones(1, 7) * 3);
+    aeroOptions.anomalousOxygen = getEnvValue(simParams, 'enableAnomalousOxygen', false);
+    aeroOptions.gsi_model = getEnvValue(simParams, 'gasSurfaceInteractionModel', 'cook');
+    aeroOptions.alpha = getEnvValue(simParams, 'accommodationCoefficient', 1);
+    aeroOptions.Tw = getEnvValue(simParams, 'wallTemperature', 300);
+    aeroOptions.enableShadow = getEnvValue(simParams, 'enableShadowAnalysis', true);
+    aeroOptions.enableSolar = getEnvValue(simParams, 'enableSolarRadiationPressure', true);
+    aeroOptions.sol_cR = getEnvValue(simParams, 'specularReflectivity', 0.15);
+    aeroOptions.sol_cD = getEnvValue(simParams, 'diffuseReflectivity', 0.25);
+
+    try
+        aeroResults = computeAeroForces(objFilePath, location, attitude, time, aeroOptions);
+        tauCandidate = reshape(aeroResults.M_aero, [], 1);
+
+        if isfield(aeroResults, 'M_solar')
+            tauCandidate = tauCandidate + reshape(aeroResults.M_solar, [], 1);
+        end
+
+        if numel(tauCandidate) == 3 && all(isfinite(tauCandidate))
+            tauAero = tauCandidate;
+        end
+    catch
+        tauAero = [0; 0; 0];
+    end
+end
+
+function csvPath = saveTorqueBreakdownCsv(simParams, tOut, controlTorques, aeroTorques, totalTorques)
+    csvPath = '';
+
+    thisFilePath = fileparts(mfilename('fullpath'));
+    simDirectory = fullfile(thisFilePath, '..', '..', 'simulations');
+    if ~exist(simDirectory, 'dir')
+        mkdir(simDirectory);
+    end
+
+    simName = 'simulation';
+    if isfield(simParams, 'initParams') && isfield(simParams.initParams, 'Simulation') && ...
+            isfield(simParams.initParams.Simulation, 'name') && ~isempty(simParams.initParams.Simulation.name)
+        simName = simParams.initParams.Simulation.name;
+    end
+
+    simName = regexprep(simName, '[^a-zA-Z0-9_\- ]', '_');
+    simName = strtrim(simName);
+    simName = regexprep(simName, '\s+', '_');
+    if isempty(simName)
+        simName = 'simulation';
+    end
+
+    csvPath = fullfile(simDirectory, [simName, '_torque_breakdown.csv']);
+
+    torqueTable = table( ...
+        tOut, ...
+        controlTorques(:, 1), controlTorques(:, 2), controlTorques(:, 3), ...
+        aeroTorques(:, 1), aeroTorques(:, 2), aeroTorques(:, 3), ...
+        totalTorques(:, 1), totalTorques(:, 2), totalTorques(:, 3), ...
+        'VariableNames', { ...
+            'time_s', ...
+            'tau_control_x', 'tau_control_y', 'tau_control_z', ...
+            'tau_aero_x', 'tau_aero_y', 'tau_aero_z', ...
+            'tau_total_x', 'tau_total_y', 'tau_total_z' ...
+        } ...
+    );
+
+    try
+        writetable(torqueTable, csvPath);
+    catch
+        csvPath = '';
+    end
+end
+
+function value = getEnvValue(simParams, fieldName, defaultValue)
+    value = defaultValue;
+
+    if ~isfield(simParams, 'initParams') || ~isfield(simParams.initParams, 'Environment')
+        return;
+    end
+
+    if isfield(simParams.initParams.Environment, fieldName)
+        value = simParams.initParams.Environment.(fieldName);
+    end
+end
+
+function enabled = getModeFlag(simParams, fieldName, defaultValue)
+    enabled = defaultValue;
+
+    if ~isfield(simParams, 'initParams') || ~isfield(simParams.initParams, 'Modes')
+        return;
+    end
+
+    if isfield(simParams.initParams.Modes, fieldName)
+        enabled = logical(simParams.initParams.Modes.(fieldName));
     end
 end

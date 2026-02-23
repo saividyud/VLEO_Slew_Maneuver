@@ -17,6 +17,40 @@ function openLoadSimulation(mainFigHandle)
             simParams = loadedData.simParams; % Extract simParams from the loaded data
             % assignin('base', 'simParams', simParams); % Assign simParams to base workspace for access in other functions
             disp('Simulation parameters loaded successfully.');
+
+            % Backward compatibility defaults
+            if ~isfield(simParams, 'initParams')
+                simParams.initParams = struct();
+            end
+            if ~isfield(simParams.initParams, 'Modes')
+                simParams.initParams.Modes = struct('enableAero', true, 'enableControl', true);
+            end
+            if ~isfield(simParams.initParams.Modes, 'enableAero')
+                simParams.initParams.Modes.enableAero = true;
+            end
+            if ~isfield(simParams.initParams.Modes, 'enableControl')
+                simParams.initParams.Modes.enableControl = true;
+            end
+            if ~isfield(simParams.initParams, 'Controller')
+                simParams.initParams.Controller = struct();
+            end
+            if ~isfield(simParams.initParams.Controller, 'functionFile') || isempty(simParams.initParams.Controller.functionFile)
+                simParams.initParams.Controller.functionFile = 'control_torques.m';
+            end
+            if ~isfield(simParams.initParams.Controller, 'Func') || ~isa(simParams.initParams.Controller.Func, 'function_handle')
+                [~, funcName, ~] = fileparts(simParams.initParams.Controller.functionFile);
+                simParams.initParams.Controller.Func = str2func(funcName);
+            end
+            if ~isfield(simParams.initParams, 'Environment')
+                simParams.initParams.Environment = struct();
+            end
+            if ~isfield(simParams.initParams.Environment, 'gasSurfaceInteractionModel') && ...
+                    isfield(simParams.initParams.Environment, 'gasSurfaceModel')
+                simParams.initParams.Environment.gasSurfaceInteractionModel = simParams.initParams.Environment.gasSurfaceModel;
+            end
+            if ~isfield(simParams.initParams.Environment, 'gasSurfaceInteractionModel')
+                simParams.initParams.Environment.gasSurfaceInteractionModel = 'cook';
+            end
         else
             disp('Error: The selected file does not contain simParams variable.');
             return; % Exit the function if simParams is not found in the file
@@ -47,7 +81,7 @@ function openLoadSimulation(mainFigHandle)
         40,...
         40,...
         40,...
-        '1x',...
+        40,...
         30,...
     };
     subGl.ColumnWidth = {
@@ -132,6 +166,12 @@ function openLoadSimulation(mainFigHandle)
     applyButtonStyle(btnController)
     btnController.Layout.Row = 8;
     btnController.Layout.Column = 3;
+
+    % Dynamics mode button
+    btnModes = uibutton(subGl, 'Text', 'Set Aero/Control Modes');
+    applyButtonStyle(btnModes)
+    btnModes.Layout.Row = 9;
+    btnModes.Layout.Column = 3;
     
     % Optional: Handle if user clicks the 'X' on window frame instead of Back
     subFig.CloseRequestFcn = @(~,~) goBack(subFig, mainFigHandle);
@@ -148,6 +188,7 @@ function openLoadSimulation(mainFigHandle)
     btnAttitude.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Attitude Parameters');
     btnEnvironmental.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Environmental Parameters');
     btnController.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Controller Parameters');
+    btnModes.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Aero/Control Modes');
 
     function saveSimulationData()
         disp('Saving simulation data...');

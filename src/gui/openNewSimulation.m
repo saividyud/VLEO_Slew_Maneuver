@@ -24,7 +24,7 @@ function openNewSimulation(mainFigHandle)
         40,...
         40,...
         40,...
-        '1x',...
+        40,...
         30,...
     };
     subGl.ColumnWidth = {
@@ -109,6 +109,12 @@ function openNewSimulation(mainFigHandle)
     applyButtonStyle(btnController)
     btnController.Layout.Row = 8;
     btnController.Layout.Column = 3;
+
+    % Dynamics mode button
+    btnModes = uibutton(subGl, 'Text', 'Set Aero/Control Modes');
+    applyButtonStyle(btnModes)
+    btnModes.Layout.Row = 9;
+    btnModes.Layout.Column = 3;
     
     % Optional: Handle if user clicks the 'X' on window frame instead of Back
     subFig.CloseRequestFcn = @(~,~) goBack(subFig, mainFigHandle);
@@ -172,8 +178,13 @@ function openNewSimulation(mainFigHandle)
     );
 
     simParams.initParams.Controller = struct(...
-        'functionFile', 'myController.m', ...
-        'Func', @(t, X) [0; 0; 0] ... % Default to a dummy controller that applies zero torque
+        'functionFile', 'control_torques.m', ...
+        'Func', @control_torques ...
+    );
+
+    simParams.initParams.Modes = struct(...
+        'enableAero', true, ...
+        'enableControl', true ...
     );
 
     guidata(subFig, simParams); % Store in figure's guidata for access in callbacks
@@ -188,6 +199,7 @@ function openNewSimulation(mainFigHandle)
     btnAttitude.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Attitude Parameters');
     btnEnvironmental.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Environmental Parameters');
     btnController.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Controller Parameters');
+    btnModes.ButtonPushedFcn = @(~,~) functionalButtons(subFig, 'Set Aero/Control Modes');
 
     function saveSimulationData()
         disp('Saving simulation data...');
