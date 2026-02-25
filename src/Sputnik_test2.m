@@ -13,7 +13,6 @@ wy = y(:,12);
 wz = y(:,13);
 %coversion to roll pitch yaw
 
-
 %plotting
 %orientation euler angles
 figure(1)
