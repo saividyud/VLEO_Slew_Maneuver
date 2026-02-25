@@ -10,8 +10,114 @@ function functionalButtons(subFigHandle, buttonType)
             setEnvironmentalParameters(subFigHandle);
         case 'Set Controller Parameters'
             setControllerParameters(subFigHandle);
+        case 'Set Aero/Control Modes'
+            setAeroControlModes(subFigHandle);
         otherwise
             error('Unknown button type: %s', buttonType);
+    end
+end
+
+function setAeroControlModes(subFigHandle)
+    salmonColor = [1, 0.4941, 0.4392];
+
+    % Read current parameters from parent figure
+    simParams = guidata(subFigHandle);
+
+    if ~isfield(simParams.initParams, 'Modes')
+        simParams.initParams.Modes = struct('enableAero', true, 'enableControl', true);
+    end
+    if ~isfield(simParams.initParams.Modes, 'enableAero')
+        simParams.initParams.Modes.enableAero = true;
+    end
+    if ~isfield(simParams.initParams.Modes, 'enableControl')
+        simParams.initParams.Modes.enableControl = true;
+    end
+
+    % Create the mode configuration window
+    subFig = uifigure('Name', 'Set Aero/Control Modes', ...
+                      'Position', [500, 300, 600, 320]);
+
+    subGl = uigridlayout(subFig);
+    subGl.RowHeight = {30, '1x', 40, 40, '1x', 30};
+    subGl.ColumnWidth = {'fit', 180, 220, '1x'};
+
+    % Title
+    lbl = uilabel(subGl, 'Text', 'Set Aero/Control Modes');
+    lbl.FontName = 'Times New Roman';
+    lbl.FontSize = 20;
+    lbl.FontWeight = 'bold';
+    lbl.Layout.Row = 1;
+    lbl.Layout.Column = [1 4];
+    lbl.HorizontalAlignment = 'center';
+
+    % Aero mode
+    lblAero = uilabel(subGl, 'Text', 'Enable aerodynamic model');
+    lblAero.FontName = 'Times New Roman';
+    lblAero.FontSize = 14;
+    lblAero.Layout.Row = 3;
+    lblAero.Layout.Column = 3;
+
+    entryAero = uidropdown(subGl);
+    entryAero.Items = {'true', 'false'};
+    entryAero.FontName = 'Times New Roman';
+    entryAero.FontSize = 14;
+    entryAero.Layout.Row = 3;
+    entryAero.Layout.Column = 2;
+    if simParams.initParams.Modes.enableAero
+        entryAero.Value = 'true';
+    else
+        entryAero.Value = 'false';
+    end
+
+    % Control mode
+    lblControl = uilabel(subGl, 'Text', 'Enable control torques');
+    lblControl.FontName = 'Times New Roman';
+    lblControl.FontSize = 14;
+    lblControl.Layout.Row = 4;
+    lblControl.Layout.Column = 3;
+
+    entryControl = uidropdown(subGl);
+    entryControl.Items = {'true', 'false'};
+    entryControl.FontName = 'Times New Roman';
+    entryControl.FontSize = 14;
+    entryControl.Layout.Row = 4;
+    entryControl.Layout.Column = 2;
+    if simParams.initParams.Modes.enableControl
+        entryControl.Value = 'true';
+    else
+        entryControl.Value = 'false';
+    end
+
+    % Save button
+    btnSaveClose = uibutton(subGl, 'Text', 'Save and Close');
+    btnSaveClose.FontName = 'Times New Roman';
+    btnSaveClose.FontSize = 14;
+    btnSaveClose.Layout.Row = 6;
+    btnSaveClose.Layout.Column = 1;
+    btnSaveClose.BackgroundColor = salmonColor;
+    btnSaveClose.ButtonPushedFcn = @(~,~) SaveClose();
+
+    function SaveClose()
+        simParams = guidata(subFigHandle);
+
+        if ~isfield(simParams.initParams, 'Modes')
+            simParams.initParams.Modes = struct();
+        end
+
+        simParams.initParams.Modes.enableAero = strcmp(entryAero.Value, 'true');
+        simParams.initParams.Modes.enableControl = strcmp(entryControl.Value, 'true');
+
+        simParams.saved = false;
+
+        simName = simParams.initParams.Simulation.name;
+        if contains(lower(subFigHandle.Name), 'load')
+            subFigHandle.Name = ['Load Simulation - ', simName, ' *'];
+        else
+            subFigHandle.Name = ['New Simulation - ', simName, ' *'];
+        end
+
+        guidata(subFigHandle, simParams);
+        delete(subFig);
     end
 end
 
@@ -1397,7 +1503,7 @@ function setEnvironmentalParameters(subFigHandle)
         'F107', entryF107, ...
         'F107D', entryF107D, ...
         'magneticIndices', entryMags, ...
-        'gasSurfaceModel', entryGSI, ...
+        'gasSurfaceInteractionModel', entryGSI, ...
         'accommodationCoefficient', entryAccom, ...
         'wallTemperature', entryTemp, ...
         'specularReflectivity', entrySpec, ...
@@ -1420,7 +1526,7 @@ function setEnvironmentalParameters(subFigHandle)
         simParams.initParams.Environment.F107Average = entryStruct.F107.Value;
         simParams.initParams.Environment.F107Daily = entryStruct.F107D.Value;
         simParams.initParams.Environment.magneticIndices = arrayfun(@(e) e.Value, entryStruct.magneticIndices);
-        simParams.initParams.Environment.gasSurfaceModel = entryStruct.gasSurfaceModel.Value;
+        simParams.initParams.Environment.gasSurfaceInteractionModel = entryStruct.gasSurfaceInteractionModel.Value;
         simParams.initParams.Environment.accommodationCoefficient = entryStruct.accommodationCoefficient.Value;
         simParams.initParams.Environment.wallTemperature = entryStruct.wallTemperature.Value;
         simParams.initParams.Environment.specularReflectivity = entryStruct.specularReflectivity.Value;

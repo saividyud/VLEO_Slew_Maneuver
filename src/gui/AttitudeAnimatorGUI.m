@@ -3,6 +3,7 @@ function AttitudeAnimatorGUI(mainFigHandle)
     simParams = guidata(mainFigHandle);
 
     save = false;
+    earthRadius = 6378.14e3;
 
     r_i = simParams.results.rs(1, :);
     v_i = simParams.results.vs(1, :);
@@ -27,6 +28,11 @@ function AttitudeAnimatorGUI(mainFigHandle)
 
     % Extract torques
     torques = simParams.results.torques;
+    if isfield(simParams.results, 'aeroTorques')
+        aeroTorques = simParams.results.aeroTorques;
+    else
+        aeroTorques = zeros(size(torques));
+    end
 
     %% Reading plot
     fig = figure(Name="CubeSat");
@@ -254,6 +260,9 @@ function AttitudeAnimatorGUI(mainFigHandle)
     hold on
     plot(ax5, ts/60, torques(:, 2), LineWidth=1, Color="b");
     plot(ax5, ts/60, torques(:, 3), LineWidth=1, Color="k");
+    plot(ax5, ts/60, aeroTorques(:, 1), 'r--', LineWidth=1);
+    plot(ax5, ts/60, aeroTorques(:, 2), 'b--', LineWidth=1);
+    plot(ax5, ts/60, aeroTorques(:, 3), 'k--', LineWidth=1);
 
     tau_1_marker = scatter(ax5, ts(1)/60, torques(1, 1), "r", 'filled');
     tau_2_marker = scatter(ax5, ts(1)/60, torques(1, 2), "b", 'filled');
@@ -267,13 +276,17 @@ function AttitudeAnimatorGUI(mainFigHandle)
 
     grid on
 
-    range = abs(max(torques(:)) - min(torques(:)));
+    combinedTorques = [torques(:); aeroTorques(:)];
+    range = abs(max(combinedTorques) - min(combinedTorques));
     if range == 0
         range = 0.01;
     end
-    ylim(ax5, [min(torques(:)) - 0.1*range, max(torques(:)) + 0.1*range])
+    ylim(ax5, [min(combinedTorques) - 0.1*range, max(combinedTorques) + 0.1*range])
 
-    legend(ax5, [tau_1_marker, tau_2_marker, tau_3_marker], {"\tau_1", "\tau_2", "\tau_3"}, Location="best")
+    legend(ax5, {"\tau_{c,1}", "\tau_{c,2}", "\tau_{c,3}", "\tau_{a,1}", "\tau_{a,2}", "\tau_{a,3}"}, Location="best")
+
+    % Make all text in the figure much larger for readability
+    set(findall(fig, '-property', 'FontSize'), 'FontSize', 24)
 
     %% Animating
     start = 1;
