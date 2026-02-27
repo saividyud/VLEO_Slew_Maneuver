@@ -1,4 +1,4 @@
-function Xd = Sat_template2_linear(t,X,Xr,Xi)
+function Xd = Sat_template2_linear(t,X,Xr,Xhist)
 % Sat_template calculates the time rate of change of the state X at a time
 % t.
 %
@@ -25,9 +25,14 @@ function Xd = Sat_template2_linear(t,X,Xr,Xi)
 
     %% Main computation
     % LC is initial torques
+    % 
+    % %update history vector
+    Xhist(:,end + 1) = X
 
-    %reference
+    %initialize derivative vector
     Xd = zeros(13,1);
+
+    %reference conditions
     q0 = Xr(1);
     q1 = Xr(2);
     q2 = Xr(3);
@@ -75,22 +80,21 @@ function Xd = Sat_template2_linear(t,X,Xr,Xi)
     KpOm = [.1 0 0 ; 0 .1 0; 0 0 .1];
     u = -Kp * X(8:10);
     u = u - KpOm*X(11:13);
-
-    % if t > 1
-    %     %integral Term
-    %     Ki = .0001;
-    %     X = ode45(@(t,X) Sat_template2_linear(t,X,Xr,Xi),[0 t],Xi);
-    %     u = u - Ki* [sum(X(:,8)) sum(X(9,:)),sum(X(10,:))];
-    % end
-
+    
+    %integral term
+    Ki = .001;
+    u = u - Ki * y(8:10)/t(end);
+    
     %Derivative Term
     Kd = .1;
     Xd2 = A*X(7:13);
-    u = u - Kd*Xd2(2:4);
+    u = u - Kd*Xd2(5:7);
     
     B = [ zeros(4,3); inv(I)];
 
     Xd(7:13) = A*X(7:13) + B*u;
+
+    
 
     % Add a controlling term, which u = K*X(11:13), where K the gain (need
     % to tune), can also add an integration term to reduce steady state

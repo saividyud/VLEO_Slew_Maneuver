@@ -1,7 +1,9 @@
 %Testing the sat template
-Xi = [0, 0, 6678e3, -7789, 0, 0,0.9961306, 0.0523491, 0.0473595, 0.0523491,0,0,0]';
+Xi = [0, 0, 6678e3, -7789, 0, 0,0.7860666, 0.1675188, 0.5709415, 0.1675188,0,0,0]';
 Xr = [1 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0];
-[t,y] = ode45(@(t,X) Sat_template2_linear(t,X,Xr,Xi),[0 1000],Xi);
+y = zeros(13,1);
+options = odeset('MaxStep',1);
+[t,y] = ode45(@(t,X) Sat_template2_linear(t,X,Xr,y),linspace(0,500,500),Xi,options);
 
 %quaternions to euler angles
 q0 = y(:,7);
