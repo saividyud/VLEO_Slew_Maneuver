@@ -1,4 +1,4 @@
-function Xd = Sat_template2_linear(t,X,Xr,Xhist)
+function [Xd,xHist] = Sat_template2_linear(t,X,Xr,xHist)
 % Sat_template calculates the time rate of change of the state X at a time
 % t.
 %
@@ -27,7 +27,7 @@ function Xd = Sat_template2_linear(t,X,Xr,Xhist)
     % LC is initial torques
     % 
     % %update history vector
-    Xhist(:,end + 1) = X
+    xHist(:,end + 1) = X;
 
     %initialize derivative vector
     Xd = zeros(13,1);
@@ -83,7 +83,7 @@ function Xd = Sat_template2_linear(t,X,Xr,Xhist)
     
     %integral term
     Ki = .001;
-    u = u - Ki * y(8:10)/t(end);
+    u = u - Ki * [sum(xHist(8,:));sum(xHist(9,:));sum(xHist(10,:))];
     
     %Derivative Term
     Kd = .1;

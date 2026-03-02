@@ -1,9 +1,9 @@
 %Testing the sat template
 Xi = [0, 0, 6678e3, -7789, 0, 0,0.7860666, 0.1675188, 0.5709415, 0.1675188,0,0,0]';
-Xr = [1 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0];
-y = zeros(13,1);
+Xr = [1 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0]; 
+xHist = zeros(13,1);
 options = odeset('MaxStep',1);
-[t,y] = ode45(@(t,X) Sat_template2_linear(t,X,Xr,y),linspace(0,500,500),Xi,options);
+[t,y] = odeRK4(@(t,X) Sat_template2_linear(t,X,Xr,xHist),linspace(0,500,500),Xi);
 
 %quaternions to euler angles
 q0 = y(:,7);
@@ -13,6 +13,7 @@ q3 = y(:,10);
 wx = y(:,11);
 wy = y(:,12);
 wz = y(:,13);
+
 %coversion to roll pitch yaw
 
 %plotting
