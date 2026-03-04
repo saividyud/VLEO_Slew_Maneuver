@@ -42,7 +42,9 @@ z_body_eci = -r_eci / norm(r_eci);
 x_body_eci = v_eci / norm(v_eci);
 y_body_eci = cross(z_body_eci, x_body_eci);
 R_Body_to_ECI = [x_body_eci, y_body_eci, z_body_eci];
-q0 = dcm_to_quaternion(R_Body_to_ECI);
+% Use Aerospace Toolbox dcm2quat (which takes DCM mapping ECI->Body and outputs scalar-first [w x y z])
+q0_aerospace = dcm2quat(R_Body_to_ECI');
+q0 = [q0_aerospace(2:4), q0_aerospace(1)]'; % Convert to scalar-last [x y z w]
 
 omega_orbit_mag = v_circ / r_orbit;
 omega_eci = omega_orbit_mag * orbit_normal_eci;
@@ -112,7 +114,7 @@ fprintf('Zenith distance at t=0: %.2f degrees (should be < 90)\n\n', zenith_dist
 t_start = -orbital_period / 2;
 t_end = orbital_period / 2;
 t_eruption = 0; % Eruption at t=0
-dt = 10; % 10 second time steps
+dt = 1; % Decrease time step to 1 second for better numerical differentiation and torque tracking
 tspan = t_start:dt:t_end;
 n_steps = length(tspan);
 
@@ -124,7 +126,7 @@ fprintf('Propagating satellite trajectory...\n');
 
 % Two ODE45 calls instead of one per time step
 ode_opts = odeset('RelTol',1e-8, 'AbsTol',1e-10);
-ode_fun = @(t,X) Sat_template(t, X, z_body_eci, params, ...
+ode_fun = @(t,X) Sat_template_control(t, X, z_body_eci, params, ...
     'useJ2', false, 'useAtmDrag', false, 'useControl', false);
 
 % Forward propagation: t=0 to t_end
@@ -138,6 +140,11 @@ tspan_bwd = 0:-dt:t_start;
 % Combine: flip backward (exclude t=0 duplicate), then forward
 X_history = [flipud(X_bwd(2:end,:)); X_fwd];
 
+% The concatenated time arrays might have a slightly different size due to length(tspan) 
+% vs length(X_history). Make sure they match exactly.
+n_steps = size(X_history, 1);
+tspan = [fliplr(tspan_bwd(2:end)), tspan_fwd];
+
 % Pre-allocate output arrays
 ra_camera_history = zeros(n_steps, 1);
 dec_camera_history = zeros(n_steps, 1);
@@ -146,6 +153,8 @@ dec_volcano_history = zeros(n_steps, 1);
 visibility_history = zeros(n_steps, 1);
 zenith_distance_history = zeros(n_steps, 1);
 pointing_eci_history = zeros(n_steps, 3);
+omega_req_eci_history = zeros(n_steps, 3);
+tau_body_history = zeros(n_steps, 3);
 
 % Post-process all time steps (no ODE integration needed)
 for i = 1:n_steps
@@ -188,6 +197,68 @@ for i = 1:n_steps
     volcano_to_sat_unit = volcano_to_sat / norm(volcano_to_sat);
     cos_zenith = dot(zenith_at_volcano, volcano_to_sat_unit);
     zenith_distance_history(i) = rad2deg(acos(cos_zenith));
+
+    % Required angular velocity for tracking
+    omega_earth_vec = [0; 0; params.omega_earth];
+    v_volcano_t = cross(omega_earth_vec, r_volcano_t);
+    v_sat = X_history(i, 4:6)';
+    r_rel = r_volcano_t - r_sat;
+    v_rel = v_volcano_t - v_sat;
+    
+    % Use kinematic approach with DCM to guarantee correct body frame omega
+    % Define desired Body Frame (Z points to volcano, Y cross product of Z and V)
+    z_b = r_rel / norm(r_rel); 
+    y_b = cross(z_b, v_sat);
+    if norm(y_b) < 1e-6
+        y_b = cross(z_b, r_sat); 
+    end
+    y_b = y_b / norm(y_b);
+    x_b = cross(y_b, z_b);
+    
+    % This is the rotation matrix from Body to ECI
+    R_B2E_hist(:,:,i) = [x_b, y_b, z_b];
+end
+
+% Compute angular velocity by numerically differentiating the DCM
+% R_dot = R * skew(omega_body) -> skew(omega_body) = R' * R_dot
+omega_body_history = zeros(n_steps, 3);
+R_dot = zeros(3, 3, n_steps);
+
+for i = 2:n_steps-1
+    R_dot(:,:,i) = (R_B2E_hist(:,:,i+1) - R_B2E_hist(:,:,i-1)) / (2*dt);
+end
+R_dot(:,:,1) = (R_B2E_hist(:,:,2) - R_B2E_hist(:,:,1)) / dt;
+R_dot(:,:,n_steps) = (R_B2E_hist(:,:,n_steps) - R_B2E_hist(:,:,n_steps-1)) / dt;
+
+for i = 1:n_steps
+    R = R_B2E_hist(:,:,i);
+    R_d = R_dot(:,:,i);
+    skew_w = R' * R_d;
+    
+    % Extract omega from skew-symmetric matrix:
+    % [  0   -w3   w2]
+    % [ w3    0   -w1]
+    % [-w2   w1    0 ]
+    omega_body_history(i, 1) = skew_w(3, 2);
+    omega_body_history(i, 2) = skew_w(1, 3);
+    omega_body_history(i, 3) = skew_w(2, 1);
+end
+
+% Calculate angular acceleration in body frame
+alpha_body_history = zeros(n_steps, 3);
+for i = 2:n_steps-1
+    alpha_body_history(i, :) = (omega_body_history(i+1, :) - omega_body_history(i-1, :)) / (2 * dt);
+end
+alpha_body_history(1, :) = (omega_body_history(2, :) - omega_body_history(1, :)) / dt;
+alpha_body_history(end, :) = (omega_body_history(end, :) - omega_body_history(end-1, :)) / dt;
+
+% Calculate torque in body frame
+for i = 1:n_steps
+    omega_body = omega_body_history(i, :)';
+    alpha_body = alpha_body_history(i, :)';
+    
+    tau_body = params.I_CB * alpha_body + cross(omega_body, params.I_CB * omega_body);
+    tau_body_history(i, :) = tau_body';
 end
 
 % Find visibility events
@@ -302,4 +373,148 @@ yline(90, 'r--', 'LineWidth', 1.5, 'Label', 'Horizon (90°)', 'FontSize', 13);
 ylim([0 180]);
 legend('Zenith Distance', 'Location', 'best', 'FontSize', 14);
 
+% === Required Torque Plot ===
+fprintf('Generating Required Torque plot...\n');
+figure('Name', 'Required Torque (Body Frame) vs Time', 'Position', [100 100 1400 500]);
+
+plot(tspan / 60, tau_body_history(:, 1), 'r-', 'LineWidth', 2.5); hold on;
+plot(tspan / 60, tau_body_history(:, 2), 'g-', 'LineWidth', 2.5);
+plot(tspan / 60, tau_body_history(:, 3), 'b-', 'LineWidth', 2.5);
+xlabel('Time (minutes)', 'FontSize', 24);
+ylabel('Torque (N\cdotm)', 'FontSize', 24);
+title('Required Tracking Torque (Body Frame) vs Time', 'FontSize', 28);
+legend('\tau_x', '\tau_y', '\tau_z', 'Location', 'best', 'FontSize', 20);
+set(gca, 'FontSize', 20);
+grid on;
+
+% Mark events
+if ~isnan(t_start_visible)
+    xline(t_start_visible / 60, 'g-', 'LineWidth', 2, 'Label', 'Start Visible', 'FontSize', 18);
+end
+xline(t_eruption / 60, 'k--', 'LineWidth', 2.5, 'Label', 'Eruption (t=0)', 'FontSize', 18);
+if ~isnan(t_end_visible)
+    xline(t_end_visible / 60, 'm-', 'LineWidth', 2, 'Label', 'Out of Sight', 'FontSize', 18);
+end
+
+% Set the x-axis limits to the visibility window
+if ~isnan(t_start_visible) && ~isnan(t_end_visible)
+    xlim([t_start_visible / 60, t_end_visible / 60]);
+end
+
+% === Verification Simulation ===
+if ~isnan(t_start_visible) && ~isnan(t_end_visible)
+    fprintf('Running Verification Simulation...\n');
+    idx_start = idx_start_visible(1);
+    idx_end = idx_end_visible(1);
+    
+    % Initial state for verification: Perfectly tracking the volcano
+    t0_verif = tspan(idx_start);
+    r_sat0 = X_history(idx_start, 1:3)';
+    v_sat0 = X_history(idx_start, 4:6)';
+    
+    % Reconstruct the initial attitude that points at the volcano
+    r_volcano_t0 = [cos(params.omega_earth * t0_verif) * r_volcano_0(1) - sin(params.omega_earth * t0_verif) * r_volcano_0(2);
+                    sin(params.omega_earth * t0_verif) * r_volcano_0(1) + cos(params.omega_earth * t0_verif) * r_volcano_0(2);
+                    r_volcano_0(3)];
+    r_rel0 = r_volcano_t0 - r_sat0;
+    z_b0 = r_rel0 / norm(r_rel0);
+    y_b0 = cross(z_b0, v_sat0);
+    if norm(y_b0) < 1e-6, y_b0 = cross(z_b0, r_sat0); end
+    y_b0 = y_b0 / norm(y_b0);
+    x_b0 = cross(y_b0, z_b0);
+    R_ECI_to_Body0 = [x_b0, y_b0, z_b0]'; % 3x3 matrix where rows are body axes in ECI
+    
+    % Use Aerospace Toolbox dcm2quat (scalar first [w x y z])
+    q0_aerospace = dcm2quat(R_ECI_to_Body0);
+    q0_verif = [q0_aerospace(2:4), q0_aerospace(1)]'; % convert to scalar-last [x y z w]
+    
+    % Body frame angular velocity (calculated directly from DCM derivative earlier)
+    omega0_verif_body = omega_body_history(idx_start, :)';
+    % State expects ECI frame angular velocity
+    omega0_verif_eci = R_ECI_to_Body0' * omega0_verif_body;
+    
+    X0_verif = [r_sat0; v_sat0; q0_verif; omega0_verif_eci];
+    
+    % Interpolator for open-loop torque (Body Frame) using spline for smoother and more accurate torque curves
+    tau_interp = @(t) interp1(tspan, tau_body_history, t, 'spline')';
+    
+    % ODE Function for verification (open-loop torque)
+    ode_fun_verif = @(t, X) sat_dynamics_openloop(t, X, params, tau_interp);
+    
+    tspan_verif = tspan(idx_start:idx_end);
+    [~, X_verif] = ode45(ode_fun_verif, tspan_verif, X0_verif, ode_opts);
+    
+    % Calculate pointing RA/Dec and compare with apparent Volcano RA/Dec
+    ra_verif_history = zeros(length(tspan_verif), 1);
+    dec_verif_history = zeros(length(tspan_verif), 1);
+    
+    for k = 1:length(tspan_verif)
+        obs_verif = state_to_observation(X_verif(k, :)', params);
+        ra_verif_history(k) = obs_verif.ra;
+        dec_verif_history(k) = obs_verif.dec;
+    end
+    
+    % Get the apparent volcano positions for the same window
+    ra_target_history = ra_volcano_history(idx_start:idx_end);
+    dec_target_history = dec_volcano_history(idx_start:idx_end);
+    
+    % We need to handle 360 to 0 wrap around for RA error
+    ra_error = ra_verif_history - ra_target_history;
+    ra_error = mod(ra_error + 180, 360) - 180; % Wrap to [-180, 180]
+    dec_error = dec_verif_history - dec_target_history;
+    
+    figure('Name', 'Verification Pointing Error', 'Position', [150 150 1200 600]);
+    plot(tspan_verif / 60, ra_error, 'r-', 'LineWidth', 2); hold on;
+    plot(tspan_verif / 60, dec_error, 'b--', 'LineWidth', 2);
+    xlabel('Time (minutes)', 'FontSize', 20);
+    ylabel('Pointing Error (degrees)', 'FontSize', 20);
+    title('Verification: Pointing Error with Open-Loop Torque', 'FontSize', 24);
+    legend('RA Error', 'Dec Error', 'Location', 'best', 'FontSize', 16);
+    set(gca, 'FontSize', 16);
+    grid on;
+    xlim([tspan_verif(1)/60, tspan_verif(end)/60]);
+    
+    fprintf('Max RA Error: %.2e deg\n', max(abs(ra_error)));
+    fprintf('Max Dec Error: %.2e deg\n', max(abs(dec_error)));
+end
+
 fprintf('\nSimulation complete!\n');
+
+% --- Helper Function for Verification ---
+function Xd = sat_dynamics_openloop(t, X, params, tau_interp)
+    % Extract parameters
+    mu = params.mu;
+    I_CB = params.I_CB; 
+    
+    % Extract state components
+    r_eci = X(1:3);
+    v_eci = X(4:6);
+    q_eci_to_body = X(7:10);
+    omega_eci = X(11:13);
+    
+    q_eci_to_body = q_eci_to_body / norm(q_eci_to_body);
+    
+    % DCMs using Aerospace Toolbox quat2dcm
+    qx = q_eci_to_body(1); qy = q_eci_to_body(2); qz = q_eci_to_body(3); qw = q_eci_to_body(4);
+    q_aerospace = [qw, qx, qy, qz]; % scalar-first
+    R_ECI_to_Body = quat2dcm(q_aerospace);
+    R_Body_to_ECI = R_ECI_to_Body';
+    
+    omega_body = R_ECI_to_Body * omega_eci;
+    
+    Xd = zeros(13, 1);
+    Xd(1:3) = v_eci;
+    r_norm = norm(r_eci);
+    Xd(4:6) = -mu * r_eci / r_norm^3;
+    
+    Omega_matrix = [ 0, omega_body(3), -omega_body(2), omega_body(1);
+                    -omega_body(3), 0, omega_body(1), omega_body(2);
+                     omega_body(2), -omega_body(1), 0, omega_body(3);
+                    -omega_body(1), -omega_body(2), -omega_body(3), 0 ];
+    Xd(7:10) = 0.5 * Omega_matrix * q_eci_to_body;
+    
+    tau_body = tau_interp(t);
+    
+    alpha_body = I_CB \ (tau_body - cross(omega_body, I_CB * omega_body));
+    Xd(11:13) = R_Body_to_ECI * alpha_body;
+end
