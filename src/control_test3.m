@@ -206,13 +206,26 @@ for i = 1:n_steps
     v_rel = v_volcano_t - v_sat;
     
     % Use kinematic approach with DCM to guarantee correct body frame omega
-    % Define desired Body Frame (Z points to volcano, Y cross product of Z and V)
+    % Define desired Body Frame
+    % Z points to volcano
     z_b = r_rel / norm(r_rel); 
-    y_b = cross(z_b, v_sat);
-    if norm(y_b) < 1e-6
-        y_b = cross(z_b, r_sat); 
+    
+    % Minimum-roll tracking frame: Y is perpendicular to the instantaneous 
+    % plane of motion of the pointing vector (Z cross Z_dot)
+    dist = norm(r_rel);
+    z_b_dot = (v_rel / dist) - z_b * (dot(r_rel, v_rel) / dist^2);
+    
+    y_b = cross(z_b, z_b_dot);
+    if norm(y_b) < 1e-10
+        % Fallback if looking directly along the velocity vector
+        y_b = cross(z_b, v_sat); 
+        if norm(y_b) < 1e-10
+            y_b = cross(z_b, r_sat);
+        end
     end
     y_b = y_b / norm(y_b);
+    
+    % X completes the triad
     x_b = cross(y_b, z_b);
     
     % This is the rotation matrix from Body to ECI
@@ -412,15 +425,30 @@ if ~isnan(t_start_visible) && ~isnan(t_end_visible)
     r_sat0 = X_history(idx_start, 1:3)';
     v_sat0 = X_history(idx_start, 4:6)';
     
-    % Reconstruct the initial attitude that points at the volcano
+    % Reconstruct the initial attitude that points at the volcano using Minimum Roll frame
     r_volcano_t0 = [cos(params.omega_earth * t0_verif) * r_volcano_0(1) - sin(params.omega_earth * t0_verif) * r_volcano_0(2);
                     sin(params.omega_earth * t0_verif) * r_volcano_0(1) + cos(params.omega_earth * t0_verif) * r_volcano_0(2);
                     r_volcano_0(3)];
+    omega_earth_vec = [0; 0; params.omega_earth];
+    v_volcano_t0 = cross(omega_earth_vec, r_volcano_t0);
+    
     r_rel0 = r_volcano_t0 - r_sat0;
+    v_rel0 = v_volcano_t0 - v_sat0;
+    
     z_b0 = r_rel0 / norm(r_rel0);
-    y_b0 = cross(z_b0, v_sat0);
-    if norm(y_b0) < 1e-6, y_b0 = cross(z_b0, r_sat0); end
+    
+    dist0 = norm(r_rel0);
+    z_b_dot0 = (v_rel0 / dist0) - z_b0 * (dot(r_rel0, v_rel0) / dist0^2);
+    
+    y_b0 = cross(z_b0, z_b_dot0);
+    if norm(y_b0) < 1e-10
+        y_b0 = cross(z_b0, v_sat0);
+        if norm(y_b0) < 1e-10
+            y_b0 = cross(z_b0, r_sat0); 
+        end
+    end
     y_b0 = y_b0 / norm(y_b0);
+    
     x_b0 = cross(y_b0, z_b0);
     R_ECI_to_Body0 = [x_b0, y_b0, z_b0]'; % 3x3 matrix where rows are body axes in ECI
     
