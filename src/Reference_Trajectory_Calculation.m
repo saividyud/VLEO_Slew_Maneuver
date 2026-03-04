@@ -65,12 +65,14 @@ q = zeros(4,length(v_point));
 ang = zeros(3,length(v_point));
 for i = 1:length(v_point)
     v_1 = v_point(i,1:3);
-    v_3 = [0 0 1];
-    v_2 = cross(v_3,v_1);
-    v_3 = cross(v_1,v_2);
-    DCM = [v_1' , v_2', v_3' ];
+    up  = [0 0 1];
+    v_2 = cross(up, v_1);
+    v_2 = v_2 / norm(v_2);
+    v_3 = cross(v_1, v_2);
+    v_3 = v_3 / norm(v_3);
+    DCM = [v_1', v_2', v_3'];
     q(:,i) = QfromDCM(DCM);
-    [ang(1,i) ,ang(2,i),ang(3,i)] = quat2angle(q(:,i)');
+    [ang(1,i), ang(2,i), ang(3,i)] = quat2angle(q(:,i)');
 end
 
 figure(3)
