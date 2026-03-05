@@ -19,7 +19,7 @@ om = 7.29e-5;
 earthRadius = 6378.14e3; % Earth equatorial radius [m]
 a = 250e3 + earthRadius; % 250 km above Earth semimajor axis
 e = 0; % Eccentricity
-i = 0; % Inclination
+i = 45; % Inclination
 raan = 0; % Right ascension of ascending node
 aop = 0; % Argument of periapse
 ta = 0; % True anomaly
@@ -83,7 +83,7 @@ title('Euler Angles of Satellite When Pointing to Reference Location')
 
 figure(4)
 q= q.*57.3;
-plot(t,q(1,:),'o',t,q(2,:),'o',t,q(3,:),'o',t,q(4,:));
+plot(t,q(1,:),'o',t,q(2,:),'o',t,q(3,:),'o',t,q(4,:),'o');
 legend('q0','q1','q2','q3');
 title('Euler Angles of Satellite When Pointing to Reference Location')
 

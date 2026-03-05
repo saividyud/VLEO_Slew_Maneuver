@@ -17,12 +17,13 @@ function LC = control_torques(t, X)
     ICB = 2/5*83*(.58/2)^2*[1 0 0 ; 0 1 0 ;0 0 1]; % [kg m^2]
 
     %calculating u
+    q_r = [1; 0; 0; 0]
     w_r = [0;0;0];
     wdot_r = [0;0;0];
     P = [.15 0 0; 0 .15 0; 0 0 .15];
     Kp = [.0025 0 0 ; 0 .0025 0 ; 0 0 .0025];
     delw = X(11:13) - w_r;
-    u = -Kp * X(8:10);
+    u = -Kp * q(_r(2:4) - X(8:10));
     u = u- P * delw;
     u = u + ICB * wdot_r;
     u = u - cross(X(11:13),w_r);
