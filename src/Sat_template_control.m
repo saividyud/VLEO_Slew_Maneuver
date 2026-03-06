@@ -40,9 +40,10 @@ omega_eci = X(11:13);
 q_eci_to_body = q_eci_to_body / norm(q_eci_to_body);
 
 % === Frame Conversion ===
-% Reconstruct the rotation matrix from the quaternion
-R_Body_to_ECI = quaternion_to_dcm(q_eci_to_body);
-R_ECI_to_Body = R_Body_to_ECI';
+% Aerospace Toolbox uses scalar-first quaternions.
+q_scalar_first = [q_eci_to_body(4), q_eci_to_body(1:3)'];
+R_ECI_to_Body = quat2dcm(q_scalar_first);
+R_Body_to_ECI = R_ECI_to_Body';
 
 % Convert angular velocity from ECI to the body frame for dynamics calculation
 omega_body = R_ECI_to_Body * omega_eci;
@@ -96,13 +97,4 @@ alpha_body = I_CB \ (tau_body - cross(omega_body, I_CB * omega_body));
 alpha_eci = R_Body_to_ECI * alpha_body;
 Xd(11:13) = alpha_eci;
 
-end
-
-% --- Helper Functions ---
-function R = quaternion_to_dcm(q)
-% Converts a scalar-last quaternion [qx, qy, qz, qw] to a DCM (Body to ECI)
-qx = q(1); qy = q(2); qz = q(3); qw = q(4);
-R = [1 - 2*(qy^2 + qz^2),   2*(qx*qy - qw*qz),   2*(qx*qz + qw*qy);
-     2*(qx*qy + qw*qz),   1 - 2*(qx^2 + qz^2),   2*(qy*qz - qw*qx);
-     2*(qx*qz - qw*qy),   2*(qy*qz + qw*qx),   1 - 2*(qx^2 + qy^2)];
 end

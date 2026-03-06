@@ -27,13 +27,14 @@ The codebase **SHALL** maintain a modular structure enabling simultaneous indepe
 ```
 VLEO_Slew_Maneuver/
 ├── src/                    # Core reusable source code
-│   ├── utils/              # Mathematical transformations (DCM, quaternions, orbital elements)
-│   ├── dynamics/           # Physics models (perturbations, control torques)
+│   ├── controllers/        # Control laws and torque models
+│   ├── dynamics/           # Physics models and assets
+│   ├── gui/                # GUI and visualization code
 │   ├── propagators/        # Orbit propagation methods
 │   └── analysis/           # Analysis and post-processing functions
 ├── lib/                    # External libraries (HPOP, SGP4, etc.) - DO NOT MODIFY
 ├── tests/                  # Verification and unit tests
-├── examples/               # Example use cases and demonstrations
+├── examples/               # Examples for custom repo functions and demos
 ├── docs/                   # Documentation and theory
 ├── workspaces/             # Personal development sandboxes
 │   ├── Nill/
@@ -77,12 +78,14 @@ Every function in `src/` **MUST** have:
    - Tests edge cases (zero inputs, singularities, limits)
    - Returns PASS/FAIL status
 
+Every **custom repo function** in `src/` **MUST** also have:
+
 2. **Example Use Case** (`examples/example_<function_name>.m`)
    - Demonstrates typical usage
    - Contains explanatory comments
    - Produces interpretable output (plots or printed values)
 
-**Exception**: Simple wrappers or one-liner functions may share test files with related functions.
+**Exception**: Direct use of MATLAB or Aerospace Toolbox functions does not create a new example-file requirement.
 
 ### 2.2 No Redundant Functions
 **DO NOT** create custom functions if MATLAB built-in or well-established library functions exist.
@@ -134,7 +137,7 @@ $$a_{J2} = \frac{3}{2} J_2 \frac{\mu R_E^2}{r^4} \begin{bmatrix} ... \end{bmatri
 
 **Source**: Vallado, D. A. (2013). Fundamentals of Astrodynamics and Applications, 4th ed., p. 596
 
-**Implemented in**: `src/dynamics/J2.m`
+**Implemented in**: Aerospace Toolbox `gravityzonal` as used in `src/Sat_template.m` and `src/sat_template_gui.m`
 ```
 
 ### 2.5 No Magic Numbers
@@ -176,13 +179,13 @@ Functions **SHALL**:
 - Handle edge cases gracefully (circular orbits, singularities, etc.)
 
 ```matlab
-function oe = OEfromRV(r, v, mu)
+function oe = state_to_elements(r, v, mu)
     % Input validation
     if length(r) ~= 3 || length(v) ~= 3
-        error('OEfromRV:InvalidInput', 'r and v must be 3-element vectors');
+        error('state_to_elements:InvalidInput', 'r and v must be 3-element vectors');
     end
     if mu <= 0
-        error('OEfromRV:InvalidInput', 'mu must be positive');
+        error('state_to_elements:InvalidInput', 'mu must be positive');
     end
     % ...
 end
@@ -416,9 +419,9 @@ Types:
 **Examples**:
 ```
 Add: J3 perturbation model in dynamics
-Fix: Singular case handling in OEfromRV for circular orbits
+Fix: Handle circular-orbit singularity in state-to-elements conversion
 Docs: Update theory.md with quaternion kinematics derivation
-Test: Add verification test for DCMfromQ against Vallado examples
+Test: Add quaternion conversion verification against Vallado examples
 ```
 
 ### 5.3 Pull Request Requirements
@@ -440,7 +443,7 @@ Before requesting review:
 - [ ] No magic numbers (Section 2.5)
 - [ ] Units are SI (Section 3.3)
 - [ ] Test file exists in `tests/`
-- [ ] Example file exists in `examples/`
+- [ ] Example file exists in `examples/` for each new custom repo function
 - [ ] Theory added to `docs/theory.md` (if new physics)
 - [ ] Code runs without errors
 - [ ] Edge cases handled
@@ -500,4 +503,3 @@ Typical ranges for VLEO ion thruster analysis:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-12-30 | Team | Initial draft |
-

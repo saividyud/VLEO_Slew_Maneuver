@@ -328,7 +328,7 @@ function AttitudeAnimatorGUI(mainFigHandle)
             % Rotating body frame
             beta_now = betas(i, :)';
 
-            R_BI = DCMfromQ(beta_now);
+            R_BI = quat2dcm(beta_now');
             b_1 = R_BI(1, :)';
             b_2 = R_BI(2, :)';
             b_3 = R_BI(3, :)';

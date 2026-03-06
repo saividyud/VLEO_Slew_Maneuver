@@ -7,11 +7,12 @@ Computationally determining the feasibility of using ion thrusters for slew mane
 ```text
 .
 ├── src/                # Core source code (must meet compliance standards)
-│   ├── utils/          # Mathematical conversions (DCM, quaternions, orbital elements)
-│   └── dynamics/       # Physics models (J2, control torques)
-├── lib/                # External libraries (HPOP, SGP4, ADBSat) - DO NOT MODIFY
+│   ├── controllers/    # Control laws and torque models
+│   ├── dynamics/       # Physics models and assets
+│   └── gui/            # GUI and visualization code
+├── lib/                # External libraries (HPOP, SGP4, etc.) - DO NOT MODIFY
 ├── tests/              # Unit tests and verification scripts
-├── examples/           # Example use cases for each function
+├── examples/           # Examples for custom repo functions and demos
 ├── docs/               # Documentation and theory
 │   └── theory.md       # Mathematical foundations and citations
 ├── data/               # Shared data files (TLE, ephemeris)
@@ -46,7 +47,7 @@ See [PROJECT_STANDARDS.md](PROJECT_STANDARDS.md) for complete guidelines.
 
 Before merging code to `src/`:
 - [ ] Test file in `tests/`
-- [ ] Example file in `examples/`
+- [ ] Example file in `examples/` for each new custom repo function
 - [ ] Theory documented in `docs/theory.md`
 - [ ] No magic numbers
 - [ ] SI units throughout

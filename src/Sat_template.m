@@ -70,11 +70,8 @@ function Xd = Sat_template(t,X)
     q = X(7:10);  % [q0, q1, q2, q3] - scalar first
     v_eci = X(4:6);
     
-    % Rotation matrix from ECI to body frame (using quaternion)
-    q0 = q(1); q1 = q(2); q2 = q(3); q3 = q(4);
-    R_eci2body = [1-2*(q2^2+q3^2),   2*(q1*q2+q0*q3),   2*(q1*q3-q0*q2);
-                  2*(q1*q2-q0*q3),   1-2*(q1^2+q3^2),   2*(q2*q3+q0*q1);
-                  2*(q1*q3+q0*q2),   2*(q2*q3-q0*q1),   1-2*(q1^2+q2^2)];
+    % Rotation matrix from ECI to body frame
+    R_eci2body = quat2dcm(q');
     
     % Velocity in body frame
     v_body = R_eci2body * v_eci;
@@ -147,8 +144,10 @@ function Xd = Sat_template(t,X)
     %initialization
     Xd = zeros(13,1);
     
-    % Perturbation functions
-    a_J2 = J2(X);
+    % Zonal harmonics perturbation (J2/J3) using Aerospace Toolbox.
+    gravityModelMu = 3.986e14;
+    [gx, gy, gz] = gravityzonal(X(1:3)', 'Custom', 6378.14e3, gravityModelMu, [1082e-6 -2.53e-6 0], 'None');
+    a_J2 = [gx; gy; gz] + gravityModelMu * X(1:3) / r^3;
 
     % Moment of inertia tensor
     % Can start with approximating a sphere (think Sputnik)
@@ -158,7 +157,7 @@ function Xd = Sat_template(t,X)
     Xd(1:3) = X(4:6);
     
     % Translational dynamics with perturbations
-    % Includes: Two-body gravity + J2 + Aerodynamic drag + Solar radiation pressure
+    % Includes: Two-body gravity + zonal harmonics + aerodynamic drag + solar radiation pressure
     Xd(4:6) = -mu*X(1:3)/r^3 + a_J2 + a_aero;
     
     % quaternion kinematics (states 7:10) 

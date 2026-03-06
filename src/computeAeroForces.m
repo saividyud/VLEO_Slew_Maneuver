@@ -349,21 +349,12 @@ function [aoa, aos] = quaternionToAeroAngles(q)
 % q = [q0, q1, q2, q3] where q0 is scalar part
 % Assumes quaternion represents rotation from body to wind frame
 
-    q0 = q(1); q1 = q(2); q2 = q(3); q3 = q(4);
-    
-    % Rotation matrix from quaternion (body to wind)
-    R11 = 1 - 2*(q2^2 + q3^2);
-    R12 = 2*(q1*q2 + q0*q3);
-    R13 = 2*(q1*q3 - q0*q2);
-    R21 = 2*(q1*q2 - q0*q3);
-    R22 = 1 - 2*(q1^2 + q3^2);
-    R31 = 2*(q1*q3 + q0*q2);
-    R33 = 1 - 2*(q1^2 + q2^2);
+    R_body2wind = quat2dcm(q);
     
     % Extract aoa and aos from DCM
     % Using standard aerospace convention
-    aoa = atan2(R31, R11);
-    aos = asin(-R21);
+    aoa = atan2(R_body2wind(3, 1), R_body2wind(1, 1));
+    aos = asin(-R_body2wind(2, 1));
 end
 
 function results = calculateCoefficients(meshdata, aoa, aos, param_eq, flag_shad, flag_sol)

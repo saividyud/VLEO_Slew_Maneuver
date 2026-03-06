@@ -24,11 +24,14 @@ function runSimulation(subFigHandle)
     ta   = deg2rad(simParams.initParams.Orbit.trueAnomaly);
 
     orbit = [a, e, inc, raan, aop, ta];
+    muOrbit = getEnvValue(simParams, 'mu', 3.986004e14);
 
     % Compute initial position and velocity in ECI frame
-    RV  = RVfromOE(orbit);
-    r_i = RV(:, 1)'; % [m]     1x3
-    v_i = RV(:, 2)'; % [m/s]   1x3
+    [r_i_eci, v_i_eci] = keplerian2ijk(orbit(1), orbit(2), ...
+        rad2deg(orbit(3)), rad2deg(orbit(4)), rad2deg(orbit(5)), rad2deg(orbit(6)), ...
+        'GravitationalParameter', muOrbit, 'Action', 'None');
+    r_i = r_i_eci'; % [m]     1x3
+    v_i = v_i_eci'; % [m/s]   1x3
 
     %% Compute initial quaternion
     % Reference body frame aligned with orbit:
@@ -54,7 +57,10 @@ function runSimulation(subFigHandle)
                   -sp,           cp*sr,              cp*cr];
 
     R_BI_i = R_offset * R_BI_ref;
-    beta_i = QfromDCM(R_BI_i)'; % 1x4 quaternion [q0 q1 q2 q3]
+    beta_i = dcm2quat(R_BI_i);
+    if beta_i(1) < 0
+        beta_i = -beta_i;
+    end
 
     % Initial angular velocity [rad/s]
     omega_i = deg2rad([simParams.initParams.Attitude.rollRate, ...
@@ -257,13 +263,7 @@ function tauAero = evaluateAeroTorque(simParams, t, X)
     q = X(7:10);
     v_eci = X(4:6);
 
-    q0 = q(1);
-    q1 = q(2);
-    q2 = q(3);
-    q3 = q(4);
-    R_eci2body = [1-2*(q2^2+q3^2), 2*(q1*q2+q0*q3), 2*(q1*q3-q0*q2);
-                  2*(q1*q2-q0*q3), 1-2*(q1^2+q3^2), 2*(q2*q3+q0*q1);
-                  2*(q1*q3+q0*q2), 2*(q2*q3-q0*q1), 1-2*(q1^2+q2^2)];
+    R_eci2body = quat2dcm(q');
 
     v_body = R_eci2body * v_eci;
     v_mag = norm(v_body);

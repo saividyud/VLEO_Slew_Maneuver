@@ -23,10 +23,12 @@ ta = 0; % True anomaly
 
 orbit = [a, e, deg2rad(i), deg2rad(raan), deg2rad(aop), deg2rad(ta)];
 
-RV = RVfromOE(orbit);
+[r_i_eci, v_i_eci] = keplerian2ijk(orbit(1), orbit(2), ...
+    rad2deg(orbit(3)), rad2deg(orbit(4)), rad2deg(orbit(5)), rad2deg(orbit(6)), ...
+    'GravitationalParameter', 3.986004e14, 'Action', 'None');
 
-r_i = RV(:, 1)'; % [m]
-v_i = RV(:, 2)'; % [m/s]
+r_i = r_i_eci'; % [m]
+v_i = v_i_eci'; % [m/s]
 
 % Computing intial body frame such that b_1 is in the direction of motion,
 % b_3 is pointing towards surface (camera pointing), and b_2 is normal to
@@ -42,7 +44,10 @@ R_BI_i = [
     b_3_i'
 ];
 
-beta_i = QfromDCM(R_BI_i)'; % Initial quaternion
+beta_i = dcm2quat(R_BI_i);
+if beta_i(1) < 0
+    beta_i = -beta_i;
+end
 
 % Zero initial angular spin
 omega_i = [0, 0, 0]; % Initial angular rate
@@ -362,10 +367,10 @@ for i = start : step_size : length(rs)
         % Rotating body frame
         beta_now = betas(i, :)';
 
-        R_BI = DCMfromQ(beta_now);
-        b_1 = R_BI(1, :)';
-        b_2 = R_BI(2, :)';
-        b_3 = R_BI(3, :)';
+            R_BI = quat2dcm(beta_now');
+            b_1 = R_BI(1, :)';
+            b_2 = R_BI(2, :)';
+            b_3 = R_BI(3, :)';
 
         set(body_arrows{1}, 'UData', b_1(1), 'VData', b_1(2), 'WData', b_1(3));
         set(body_arrows{2}, 'UData', b_2(1), 'VData', b_2(2), 'WData', b_2(3));

@@ -1,44 +1,39 @@
 function setup_project()
-% SETUP_PROJECT Sets up the MATLAB path for the VLEO Slew Maneuver project.
-% Run this function once when you start MATLAB to ensure all dependencies
-% and utility functions are accessible.
+% SETUP_PROJECT Adds the project tree to the MATLAB path.
+% It recursively adds folders from the repository root while skipping
+% hidden/editor folders and personal workspaces.
 
-    % Get the root directory of the project
     root_dir = fileparts(mfilename('fullpath'));
+    excluded_dirs = {'.git', '.claude', '.vscode', 'workspaces', 'assets', 'docs'};
 
-    % Define directories to add to path
-    dirs_to_add = {
-        fullfile(root_dir, 'src');
-        fullfile(root_dir, 'src', 'utils');
-        fullfile(root_dir, 'src', 'dynamics');
-        fullfile(root_dir, 'src', 'gui');
-        fullfile(root_dir, 'src', 'controllers');
-        fullfile(root_dir, 'lib');
-        fullfile(root_dir, 'simulations');
-        fullfile(root_dir, 'lib', 'ADBSat');
-        fullfile(root_dir, 'lib', 'Gyroscope');
-        fullfile(root_dir, 'lib', 'HPOP');
-        fullfile(root_dir, 'lib', 'SGP4');
-        fullfile(root_dir, 'lib', 'Kumar_Examples');
-        fullfile(root_dir, 'tests');
-        fullfile(root_dir, 'examples');
-        fullfile(root_dir, 'data');
-    };
+    path_entries = strsplit(genpath(root_dir), pathsep);
 
-    % Add directories
     fprintf('Setting up project paths...\n');
-    for i = 1:length(dirs_to_add)
-        if exist(dirs_to_add{i}, 'dir')
-            addpath(dirs_to_add{i});
-            fprintf('  Added: %s\n', dirs_to_add{i});
-        else
-            fprintf('  Warning: Directory not found: %s\n', dirs_to_add{i});
+    for i = 1:numel(path_entries)
+        candidate = path_entries{i};
+        if isempty(candidate) || should_skip_path(candidate, root_dir, excluded_dirs)
+            continue;
         end
+
+        addpath(candidate);
+        fprintf('  Added: %s\n', candidate);
     end
 
-    % Optional: Add subdirectories of lib if they contain more code
-    % addpath(genpath(fullfile(root_dir, 'lib'))); 
-    % (Commented out to prevent adding .git folders or other clutter if using genpath on root)
-
     fprintf('Project setup complete.\n');
+end
+
+function tf = should_skip_path(candidate, root_dir, excluded_dirs)
+    if strcmp(candidate, root_dir)
+        relative_parts = {};
+    else
+        prefix = [root_dir filesep];
+        if startsWith(candidate, prefix)
+            relative_path = candidate(numel(prefix) + 1:end);
+        else
+            relative_path = candidate;
+        end
+        relative_parts = strsplit(relative_path, filesep);
+    end
+
+    tf = any(ismember(relative_parts, excluded_dirs));
 end

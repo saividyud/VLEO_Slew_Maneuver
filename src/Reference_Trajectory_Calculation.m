@@ -26,10 +26,12 @@ ta = 0; % True anomaly
 
 orbit = [a, e, deg2rad(i), deg2rad(raan), deg2rad(aop), deg2rad(ta)];
 
-RV = RVfromOE(orbit);
+[r_i_eci, v_i_eci] = keplerian2ijk(orbit(1), orbit(2), ...
+    rad2deg(orbit(3)), rad2deg(orbit(4)), rad2deg(orbit(5)), rad2deg(orbit(6)), ...
+    'GravitationalParameter', 3.986004e14, 'Action', 'None');
 
-r_i = RV(:, 1)'; % [m]
-v_i = RV(:, 2)'; % [m/s]
+r_i = r_i_eci'; % [m]
+v_i = v_i_eci'; % [m/s]
 Xi = [r_i(1);r_i(2);r_i(3);v_i(1);v_i(2);v_i(3); 0.5; -0.5; -0.5; 0.5; 0; 0; 0]';
 
 %integrate to find satellite position
@@ -71,7 +73,11 @@ for i = 1:length(v_point)
     v_3 = cross(v_1, v_2);
     v_3 = v_3 / norm(v_3);
     DCM = [v_1', v_2', v_3'];
-    q(:,i) = QfromDCM(DCM);
+    q_i = dcm2quat(DCM);
+    if q_i(1) < 0
+        q_i = -q_i;
+    end
+    q(:,i) = q_i';
     [ang(1,i), ang(2,i), ang(3,i)] = quat2angle(q(:,i)');
 end
 
@@ -86,6 +92,5 @@ q= q.*57.3;
 plot(t,q(1,:),'o',t,q(2,:),'o',t,q(3,:),'o',t,q(4,:),'o');
 legend('q0','q1','q2','q3');
 title('Euler Angles of Satellite When Pointing to Reference Location')
-
 
 

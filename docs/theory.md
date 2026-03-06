@@ -30,7 +30,7 @@ DCM =  │ 2(q1q2 - q0q3)          q0² - q1² + q2² - q3²  2(q2q3 + q0q1) │
 
 **Source**: Wertz, J. R., "Spacecraft Attitude Determination and Control", 1978, Eq. 12-12
 
-**Implemented in**: `src/utils/DCMfromQ.m`
+**Implemented in**: Aerospace Toolbox `quat2dcm`, used in `src/Sat_template.m`, `src/sat_template_gui.m`, `src/gui/AttitudeAnimator.m`, `src/gui/AttitudeAnimatorGUI.m`, and `src/computeAeroForces.m`
 
 ---
 
@@ -44,7 +44,7 @@ The inverse transformation uses Shepperd's method for numerical stability:
 
 **Source**: Shepperd, S.W., "Quaternion from Rotation Matrix", Journal of Guidance and Control, Vol. 1, No. 3, 1978
 
-**Implemented in**: `src/utils/QfromDCM.m`
+**Implemented in**: Aerospace Toolbox `dcm2quat`, used in `src/Reference_Trajectory_Calculation.m` and `src/gui/runSimulation.m`
 
 ---
 
@@ -69,7 +69,7 @@ e = [1; 0; 0]                   if θ = 0 (arbitrary)
 
 **Source**: Euler's rotation theorem, Kuipers, J., "Quaternions and Rotation Sequences", 1999
 
-**Implemented in**: `src/utils/QfromPAT.m`, `src/utils/PATfromQ.m`
+**Implemented in**: No current `src/` implementation. If principal-axis/angle support is needed again, add it back as a documented custom repo function.
 
 ---
 
@@ -100,7 +100,7 @@ R3(θ) =  │-sin(θ)   cos(θ)   0 │
 
 **Source**: Schaub, H. and Junkins, J., "Analytical Mechanics of Space Systems", 4th ed., 2018, Ch. 3
 
-**Implemented in**: `src/utils/FRE.m`
+**Implemented in**: No dedicated `src/` helper. Current `src/` code uses Aerospace Toolbox rotation/conversion utilities instead of a local elementary-rotation wrapper.
 
 ---
 
@@ -125,7 +125,7 @@ Given position `r` and velocity `v` in ECI frame, classical orbital elements are
 
 **Source**: Vallado, D. A., "Fundamentals of Astrodynamics and Applications", 4th ed., 2013, Algorithm 9
 
-**Implemented in**: `src/utils/OEfromRV.m`
+**Implemented in**: Aerospace Toolbox `ijk2keplerian` when state-to-elements conversion is needed
 
 ---
 
@@ -146,7 +146,7 @@ Given position `r` and velocity `v` in ECI frame, classical orbital elements are
 
 **Source**: Vallado, D. A., "Fundamentals of Astrodynamics and Applications", 4th ed., 2013, Algorithm 10
 
-**Implemented in**: `src/utils/RVfromOE.m`
+**Implemented in**: Aerospace Toolbox `keplerian2ijk`, used in `src/Reference_Trajectory_Calculation.m`, `src/gui/runSimulation.m`, and `src/gui/AttitudeAnimator.m`
 
 ---
 
@@ -214,7 +214,7 @@ Where:
 
 **Source**: Wie, B., "Space Vehicle Dynamics and Control", 2nd ed., 2008, Ch. 7
 
-**Implemented in**: `src/dynamics/control_torques.m`
+**Implemented in**: `src/controllers/control_torques.m`
 
 ---
 
@@ -239,7 +239,7 @@ Where:
 
 **Source**: Vallado, D. A., "Fundamentals of Astrodynamics and Applications", 4th ed., 2013, Eq. 8-25
 
-**Implemented in**: `src/dynamics/J2.m`
+**Implemented in**: Aerospace Toolbox `gravityzonal`, used in `src/Sat_template.m` and `src/sat_template_gui.m`
 
 ---
 
@@ -257,7 +257,7 @@ Where `J3 = -2.5327 × 10⁻⁶`
 
 **Source**: Vallado, D. A., "Fundamentals of Astrodynamics and Applications", 4th ed., 2013, Eq. 8-26
 
-**Implemented in**: `src/dynamics/J2.m`
+**Implemented in**: Aerospace Toolbox `gravityzonal`, used in `src/Sat_template.m` and `src/sat_template_gui.m`
 
 ---
 
@@ -391,4 +391,3 @@ Where:
 | Date | Author | Changes |
 |------|--------|---------|
 | 2025-12-30 | Team | Initial template with existing implementations |
-

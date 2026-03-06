@@ -35,18 +35,10 @@ function displayResults(subFigHandle)
     t_min = t / 60;
 
     %% Compute Euler angles from quaternions
-    nSteps = length(t);
-    rolls   = zeros(nSteps, 1);
-    pitches = zeros(nSteps, 1);
-    yaws    = zeros(nSteps, 1);
-
-    for k = 1:nSteps
-        R_BI = DCMfromQ(betas(k, :)');
-        % ZYX Euler angle extraction from DCM
-        pitches(k) = -asind(R_BI(1, 3));
-        rolls(k)   = atan2d(R_BI(2, 3), R_BI(3, 3));
-        yaws(k)    = atan2d(R_BI(1, 2), R_BI(1, 1));
-    end
+    [yaws, pitches, rolls] = quat2angle(betas, "ZYX");
+    rolls = rad2deg(rolls);
+    pitches = rad2deg(pitches);
+    yaws = rad2deg(yaws);
 
     % Convert angular rates to deg/s for display
     omegas_deg = rad2deg(omegas);
