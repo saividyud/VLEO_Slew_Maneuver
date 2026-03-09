@@ -1,5 +1,11 @@
 function AttitudeAnimatorGUI(mainFigHandle)
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     simParams = guidata(mainFigHandle);
 
     save = false;

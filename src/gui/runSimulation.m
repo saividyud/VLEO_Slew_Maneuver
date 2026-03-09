@@ -9,6 +9,12 @@ function runSimulation(subFigHandle)
 %   Handle to the simulation configuration figure (contains simParams in
 %   guidata)
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     %% Extract simulation parameters
     simParams = guidata(subFigHandle);
     simParams = ensureSimulationDefaults(simParams);
@@ -27,7 +33,7 @@ function runSimulation(subFigHandle)
     muOrbit = getEnvValue(simParams, 'mu', 3.986004e14);
 
     % Compute initial position and velocity in ECI frame
-    [r_i_eci, v_i_eci] = keplerian2ijk(orbit(1), orbit(2), ...
+    [r_i_eci, v_i_eci] = keplerian_to_ijk_safe(orbit(1), orbit(2), ...
         rad2deg(orbit(3)), rad2deg(orbit(4)), rad2deg(orbit(5)), rad2deg(orbit(6)), ...
         'GravitationalParameter', muOrbit, 'Action', 'None');
     r_i = r_i_eci'; % [m]     1x3

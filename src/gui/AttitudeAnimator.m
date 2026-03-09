@@ -2,6 +2,8 @@
 % clc
 % close all
 
+run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+
 %% Initializing video writer
 save = false;
 
@@ -23,7 +25,7 @@ ta = 0; % True anomaly
 
 orbit = [a, e, deg2rad(i), deg2rad(raan), deg2rad(aop), deg2rad(ta)];
 
-[r_i_eci, v_i_eci] = keplerian2ijk(orbit(1), orbit(2), ...
+[r_i_eci, v_i_eci] = keplerian_to_ijk_safe(orbit(1), orbit(2), ...
     rad2deg(orbit(3)), rad2deg(orbit(4)), rad2deg(orbit(5)), rad2deg(orbit(6)), ...
     'GravitationalParameter', 3.986004e14, 'Action', 'None');
 

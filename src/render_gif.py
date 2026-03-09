@@ -1,35 +1,88 @@
 #!/usr/bin/env python3
 # /// script
-# dependencies = ["matplotlib", "scipy", "imageio"]
+# dependencies = ["imageio", "matplotlib", "numpy", "scipy"]
 # ///
 """Render volcano observation animation to GIF from MATLAB .mat data.
 3 views: along h, along volcano projection perp to h, and complementary axis."""
 
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import scipy.io as sio
 import imageio.v2 as imageio
 import os, io
+import sys
 
 # Load data
 script_dir = os.path.dirname(os.path.abspath(__file__))
-data = sio.loadmat(os.path.join(script_dir, 'anim_data.mat'))
+project_dir = os.path.dirname(script_dir)
+simulations_dir = os.path.join(project_dir, "simulations")
+os.makedirs(simulations_dir, exist_ok=True)
 
-tspan = data['tspan'].flatten()
-X_history = data['X_history']
-visibility = data['visibility_history'].flatten()
-pointing = data['pointing_eci_history']
-r_volcano_0 = data['r_volcano_0'].flatten()
-R_e = data['params']['R_e'][0, 0].item()
-omega_earth = data['params']['omega_earth'][0, 0].item()
+
+def find_anim_data_file():
+    if os.path.isdir(simulations_dir):
+        candidates = [
+            os.path.join(simulations_dir, name)
+            for name in os.listdir(simulations_dir)
+            if name.startswith("control_test3_anim_data_") and name.endswith(".mat")
+        ]
+        if candidates:
+            candidates.sort(key=os.path.getmtime)
+            return candidates[-1]
+
+    legacy_path = os.path.join(script_dir, "anim_data.mat")
+    if os.path.isfile(legacy_path):
+        return legacy_path
+
+    raise FileNotFoundError(
+        "Could not find animation data. Run control_test3 first to create a .mat file in simulations/."
+    )
+
+
+def resolve_anim_data_path(argv):
+    if len(argv) <= 1:
+        return find_anim_data_file()
+
+    candidate = os.path.abspath(os.path.expanduser(argv[1]))
+    if os.path.isdir(candidate):
+        matches = [
+            os.path.join(candidate, name)
+            for name in os.listdir(candidate)
+            if name.startswith("control_test3_anim_data_") and name.endswith(".mat")
+        ]
+        if matches:
+            matches.sort(key=os.path.getmtime)
+            return matches[-1]
+        raise FileNotFoundError(
+            f"No control_test3 animation .mat files found in: {candidate}"
+        )
+
+    if os.path.isfile(candidate):
+        return candidate
+
+    raise FileNotFoundError(f"Animation data file not found: {candidate}")
+
+
+anim_data_path = resolve_anim_data_path(sys.argv)
+print(f"Loading animation data from: {anim_data_path}")
+data = sio.loadmat(anim_data_path)
+
+tspan = data["tspan"].flatten()
+X_history = data["X_history"]
+visibility = data["visibility_history"].flatten()
+pointing = data["pointing_eci_history"]
+r_volcano_0 = data["r_volcano_0"].flatten()
+R_e = data["params"]["R_e"][0, 0].item()
+omega_earth = data["params"]["omega_earth"][0, 0].item()
 dt = tspan[1] - tspan[0]
 
 # Find visibility window with padding
 vis_indices = np.where(visibility > 0)[0]
 if len(vis_indices) == 0:
-    print('No visibility window found, using full time range.')
+    print("No visibility window found, using full time range.")
     i_start, i_end = 0, len(tspan) - 1
 else:
     pad = int(60 / dt)
@@ -61,11 +114,13 @@ e1 = h_vec / np.linalg.norm(h_vec)
 t_mid = tspan[mid_i]
 cos_wt = np.cos(omega_earth * t_mid)
 sin_wt = np.sin(omega_earth * t_mid)
-r_volc_mid = np.array([
-    cos_wt * r_volcano_0[0] - sin_wt * r_volcano_0[1],
-    sin_wt * r_volcano_0[0] + cos_wt * r_volcano_0[1],
-    r_volcano_0[2]
-])
+r_volc_mid = np.array(
+    [
+        cos_wt * r_volcano_0[0] - sin_wt * r_volcano_0[1],
+        sin_wt * r_volcano_0[0] + cos_wt * r_volcano_0[1],
+        r_volcano_0[2],
+    ]
+)
 
 # e2: volcano direction projected perp to h
 r_volc_unit = r_volc_mid / np.linalg.norm(r_volc_mid)
@@ -84,9 +139,9 @@ def vec_to_elev_azim(d):
 
 
 views = [
-    (vec_to_elev_azim(e1), 'Along h'),
-    (vec_to_elev_azim(e2), 'Along volcano proj.'),
-    (vec_to_elev_azim(e3), 'Orthogonal'),
+    (vec_to_elev_azim(e1), "Along h"),
+    (vec_to_elev_azim(e2), "Along volcano proj."),
+    (vec_to_elev_azim(e3), "Orthogonal"),
 ]
 
 # Center on midpoint between satellite and volcano at mid-time, zoom to interaction
@@ -96,58 +151,102 @@ dist_sat = np.linalg.norm(r_mid - center)
 dist_volc = np.linalg.norm(r_volc_mid - center)
 max_range = max(dist_sat, dist_volc, R_e * 0.15) * 2.5
 
-gif_path = os.path.join(script_dir, 'volcano_observation.gif')
+gif_dir = os.path.dirname(anim_data_path)
+gif_path = os.path.join(gif_dir, "volcano_observation.gif")
 frames = []
 n_total = len(frame_indices)
 
-print(f'Rendering {n_total} frames x 3 views...')
+print(f"Rendering {n_total} frames x 3 views...")
 
 for fi, i in enumerate(frame_indices):
     t = tspan[i]
-    fig = plt.figure(figsize=(20, 7), dpi=120, facecolor='white')
+    fig = plt.figure(figsize=(20, 7), dpi=120, facecolor="white")
 
     r_sat = X_history[i, :3]
     cos_wt = np.cos(omega_earth * t)
     sin_wt = np.sin(omega_earth * t)
-    r_volc = np.array([
-        cos_wt * r_volcano_0[0] - sin_wt * r_volcano_0[1],
-        sin_wt * r_volcano_0[0] + cos_wt * r_volcano_0[1],
-        r_volcano_0[2]
-    ])
+    r_volc = np.array(
+        [
+            cos_wt * r_volcano_0[0] - sin_wt * r_volcano_0[1],
+            sin_wt * r_volcano_0[0] + cos_wt * r_volcano_0[1],
+            r_volcano_0[2],
+        ]
+    )
 
-    vis_color = '#2ecc71' if visibility[i] > 0 else '#e74c3c'
-    vis_text = 'VISIBLE' if visibility[i] > 0 else 'NOT VISIBLE'
+    vis_color = "#2ecc71" if visibility[i] > 0 else "#e74c3c"
+    vis_text = "VISIBLE" if visibility[i] > 0 else "NOT VISIBLE"
 
     for vi, ((elev, azim), label) in enumerate(views):
-        ax = fig.add_subplot(1, 3, vi + 1, projection='3d')
+        ax = fig.add_subplot(1, 3, vi + 1, projection="3d")
 
         # Earth (partial, clipped by view)
-        ax.plot_surface(xs, ys, zs, alpha=0.25, color=[0.3, 0.5, 0.8],
-                        edgecolor='none', rcount=25, ccount=25)
+        ax.plot_surface(
+            xs,
+            ys,
+            zs,
+            alpha=0.25,
+            color=[0.3, 0.5, 0.8],
+            edgecolor="none",
+            rcount=25,
+            ccount=25,
+        )
 
         # Satellite
-        ax.scatter(*r_sat, c='red', s=80, zorder=5, depthshade=False)
+        ax.scatter(*r_sat, c="red", s=80, zorder=5, depthshade=False)
 
         # Trajectory
-        ax.plot(X_history[i_start:i+1, 0], X_history[i_start:i+1, 1],
-                X_history[i_start:i+1, 2], 'r-', linewidth=1.5, alpha=0.7)
+        ax.plot(
+            X_history[i_start : i + 1, 0],
+            X_history[i_start : i + 1, 1],
+            X_history[i_start : i + 1, 2],
+            "r-",
+            linewidth=1.5,
+            alpha=0.7,
+        )
 
         # Volcano
-        ax.scatter(*r_volc, c='#FFD700', edgecolors='black', s=120,
-                   zorder=5, depthshade=False, linewidths=1.5)
+        ax.scatter(
+            *r_volc,
+            c="#FFD700",
+            edgecolors="black",
+            s=120,
+            zorder=5,
+            depthshade=False,
+            linewidths=1.5,
+        )
 
         # Visibility line
         if visibility[i] > 0:
-            ax.plot([r_volc[0], r_sat[0]], [r_volc[1], r_sat[1]],
-                    [r_volc[2], r_sat[2]], color='#2ecc71', linewidth=2.5)
+            ax.plot(
+                [r_volc[0], r_sat[0]],
+                [r_volc[1], r_sat[1]],
+                [r_volc[2], r_sat[2]],
+                color="#2ecc71",
+                linewidth=2.5,
+            )
         else:
-            ax.plot([r_volc[0], r_sat[0]], [r_volc[1], r_sat[1]],
-                    [r_volc[2], r_sat[2]], 'r--', linewidth=1.5, alpha=0.5)
+            ax.plot(
+                [r_volc[0], r_sat[0]],
+                [r_volc[1], r_sat[1]],
+                [r_volc[2], r_sat[2]],
+                "r--",
+                linewidth=1.5,
+                alpha=0.5,
+            )
 
         # Camera pointing
         pv = pointing[i] * 2e6
-        ax.quiver(r_sat[0], r_sat[1], r_sat[2], pv[0], pv[1], pv[2],
-                  color='#3498db', linewidth=2, arrow_length_ratio=0.15)
+        ax.quiver(
+            r_sat[0],
+            r_sat[1],
+            r_sat[2],
+            pv[0],
+            pv[1],
+            pv[2],
+            color="#3498db",
+            linewidth=2,
+            arrow_length_ratio=0.15,
+        )
 
         # Zoom to interaction area
         ax.set_xlim(center[0] - max_range, center[0] + max_range)
@@ -157,23 +256,28 @@ for fi, i in enumerate(frame_indices):
 
         # Clean up - remove clutter
         ax.set_axis_off()
-        ax.set_title(label, fontsize=13, fontweight='bold', pad=5)
+        ax.set_title(label, fontsize=13, fontweight="bold", pad=5)
         ax.view_init(elev=elev, azim=azim)
 
-    fig.suptitle(f't = {t/60:.2f} min    {vis_text}',
-                 fontsize=16, fontweight='bold', color=vis_color, y=0.97)
+    fig.suptitle(
+        f"t = {t / 60:.2f} min    {vis_text}",
+        fontsize=16,
+        fontweight="bold",
+        color=vis_color,
+        y=0.97,
+    )
     fig.subplots_adjust(left=0.01, right=0.99, top=0.90, bottom=0.01, wspace=0.02)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.05)
+    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.05)
     buf.seek(0)
     frames.append(imageio.imread(buf))
     buf.close()
     plt.close(fig)
 
     if (fi + 1) % 10 == 0:
-        print(f'  {fi + 1}/{n_total} frames done')
+        print(f"  {fi + 1}/{n_total} frames done")
 
-print('Writing GIF...')
+print("Writing GIF...")
 imageio.mimsave(gif_path, frames, duration=0.15, loop=0)
-print(f'GIF saved to: {gif_path}')
+print(f"GIF saved to: {gif_path}")

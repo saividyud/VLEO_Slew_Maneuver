@@ -23,6 +23,12 @@ function Xd = Sat_template2_linear(t,X,Xr)
 % t is time(used for numerical integration)
 
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     %% Main computation
     % LC is initial torques
 

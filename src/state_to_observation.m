@@ -28,6 +28,12 @@
 %
 function obs = state_to_observation(X, params)
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
 % Ensure X is column vector
 if size(X, 2) > 1
     X = X';
@@ -71,4 +77,3 @@ obs.ra_rad = ra_rad;
 obs.pointing_eci = pointing_eci;
 
 end
-

@@ -1,5 +1,11 @@
 %% Helper Function: Open Results Window
 function openResults(mainFigHandle)
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     % 1. Hide the Main Window
     mainFigHandle.Visible = 'off';
 

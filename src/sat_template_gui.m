@@ -24,6 +24,12 @@ function Xd = sat_template_gui(t, X, subFigHandle)
 % X has to be vertical for function to work
 % t is time(used for numerical integration)
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     %% Satellite configuration
     persistent objFilePath satMass ICB
     if isempty(objFilePath)

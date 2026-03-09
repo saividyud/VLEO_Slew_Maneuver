@@ -1,4 +1,10 @@
 function openSimulationGUI
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     evalin('base', 'clear'); % Clear the base workspace to ensure a clean state for the GUI
     clc
     close all

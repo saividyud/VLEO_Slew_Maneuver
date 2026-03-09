@@ -3,15 +3,31 @@ function setup_project()
 % It recursively adds folders from the repository root while skipping
 % hidden/editor folders and personal workspaces.
 
+    persistent cached_root_dir cached_path_entries
+
     root_dir = fileparts(mfilename('fullpath'));
+    setup_marker_name = 'VLEO_Slew_Maneuver_SetupRoot';
     excluded_dirs = {'.git', '.claude', '.vscode', 'workspaces', 'assets', 'docs'};
 
-    path_entries = strsplit(genpath(root_dir), pathsep);
+    if isempty(cached_path_entries) || ~strcmp(cached_root_dir, root_dir)
+        cached_path_entries = get_project_paths(root_dir, excluded_dirs);
+        cached_root_dir = root_dir;
+    end
+
+    if is_setup_marker_valid(root_dir, setup_marker_name) && ...
+            are_project_paths_available(cached_path_entries)
+        return;
+    end
+
+    if are_project_paths_available(cached_path_entries)
+        setappdata(0, setup_marker_name, root_dir);
+        return;
+    end
 
     fprintf('Setting up project paths...\n');
-    for i = 1:numel(path_entries)
-        candidate = path_entries{i};
-        if isempty(candidate) || should_skip_path(candidate, root_dir, excluded_dirs)
+    for i = 1:numel(cached_path_entries)
+        candidate = cached_path_entries{i};
+        if isempty(candidate) || is_path_entry_present(candidate)
             continue;
         end
 
@@ -20,6 +36,41 @@ function setup_project()
     end
 
     fprintf('Project setup complete.\n');
+    setappdata(0, setup_marker_name, root_dir);
+end
+
+function path_entries = get_project_paths(root_dir, excluded_dirs)
+    raw_entries = strsplit(genpath(root_dir), pathsep);
+    keep_mask = true(size(raw_entries));
+
+    for i = 1:numel(raw_entries)
+        candidate = raw_entries{i};
+        keep_mask(i) = ~isempty(candidate) && ...
+            ~should_skip_path(candidate, root_dir, excluded_dirs);
+    end
+
+    path_entries = raw_entries(keep_mask);
+end
+
+function tf = are_project_paths_available(path_entries)
+    tf = true;
+
+    for i = 1:numel(path_entries)
+        if ~is_path_entry_present(path_entries{i})
+            tf = false;
+            return;
+        end
+    end
+end
+
+function tf = is_path_entry_present(candidate)
+    current_path_entries = strsplit(path, pathsep);
+    tf = any(strcmp(current_path_entries, candidate));
+end
+
+function tf = is_setup_marker_valid(root_dir, setup_marker_name)
+    tf = isappdata(0, setup_marker_name) && ...
+        strcmp(getappdata(0, setup_marker_name), root_dir);
 end
 
 function tf = should_skip_path(candidate, root_dir, excluded_dirs)

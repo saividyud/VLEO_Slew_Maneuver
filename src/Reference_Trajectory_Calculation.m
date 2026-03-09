@@ -1,3 +1,5 @@
+run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+
 clc;clear; close all;
 
 t = 0:1:3600*.25;
@@ -26,7 +28,7 @@ ta = 0; % True anomaly
 
 orbit = [a, e, deg2rad(i), deg2rad(raan), deg2rad(aop), deg2rad(ta)];
 
-[r_i_eci, v_i_eci] = keplerian2ijk(orbit(1), orbit(2), ...
+[r_i_eci, v_i_eci] = keplerian_to_ijk_safe(orbit(1), orbit(2), ...
     rad2deg(orbit(3)), rad2deg(orbit(4)), rad2deg(orbit(5)), rad2deg(orbit(6)), ...
     'GravitationalParameter', 3.986004e14, 'Action', 'None');
 
@@ -92,5 +94,3 @@ q= q.*57.3;
 plot(t,q(1,:),'o',t,q(2,:),'o',t,q(3,:),'o',t,q(4,:),'o');
 legend('q0','q1','q2','q3');
 title('Euler Angles of Satellite When Pointing to Reference Location')
-
-

@@ -9,6 +9,12 @@ function displayResults(subFigHandle)
 %   Handle to the simulation configuration figure (must contain
 %   simParams.results in guidata after a successful runSimulation call)
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     %% Check for results
     simParams = guidata(subFigHandle);
 

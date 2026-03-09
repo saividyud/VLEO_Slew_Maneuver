@@ -22,6 +22,12 @@ function Xd = Sat_template(t,X)
 % X has to be vertical for function to work
 % t is time(used for numerical integration)
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     %% Satellite configuration (persistent to avoid reloading)
     persistent objFilePath aeroOptions satMass
     if isempty(objFilePath)

@@ -1,4 +1,10 @@
 function functionalButtons(subFigHandle, buttonType)
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     switch buttonType
         case 'Set Simulation Parameters'
             setSimulationParameters(subFigHandle);

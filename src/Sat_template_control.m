@@ -11,6 +11,12 @@
 % - X(11:13): Angular velocity of the body relative to ECI, expressed in ECI frame [rad/s].
 
 function Xd = Sat_template_control(t, X, target_pointing_eci, params, varargin)
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
 % Input parser
 p = inputParser;
 addParameter(p, 'useJ2', true, @islogical);

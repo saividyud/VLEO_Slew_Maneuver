@@ -3,11 +3,9 @@
 %
 % Tests a 6U CubeSat at 200 km altitude for a short integration
 
-clear; clc;
+run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
 
-%% Add paths
-srcPath = fileparts(mfilename('fullpath'));
-addpath(genpath(srcPath));
+clear; clc;
 
 fprintf('=== Testing Sat_template with Aerodynamics ===\n\n');
 

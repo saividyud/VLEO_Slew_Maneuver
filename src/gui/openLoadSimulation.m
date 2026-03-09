@@ -1,5 +1,11 @@
 %% Helper Function: Open Load Simulation Window
 function openLoadSimulation(mainFigHandle)
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     % Opening a .mat file dialog to select a saved simulation file
     simulationsDirectory = './simulations/';
     [file, path] = uigetfile([simulationsDirectory, '*.mat'], 'Select a simulation file to load');

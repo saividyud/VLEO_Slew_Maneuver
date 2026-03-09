@@ -18,6 +18,12 @@ function tau = myController(t, X)
 % tau : 3x1 vector
 %   Torques applied by controller
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
 tau = zeros(3, 1);
 
 end

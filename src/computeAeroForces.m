@@ -74,6 +74,12 @@ function [results] = computeAeroForces(objFilePath, location, attitude, time, op
 %
 %------------- BEGIN CODE --------------
 
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
 % Set default options
 if nargin < 5
     options = struct();

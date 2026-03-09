@@ -1,6 +1,12 @@
 %% Helper Function: Styling
 % We use this to apply Times New Roman to buttons to avoid repeating code
 function applyButtonStyle(btn)
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     lightGrayColor = [211, 211, 211] / 256;
     
     btn.FontName = 'Times New Roman';
@@ -8,4 +14,3 @@ function applyButtonStyle(btn)
     btn.FontWeight = 'bold';
     btn.BackgroundColor = lightGrayColor;
 end
-

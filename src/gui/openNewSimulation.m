@@ -1,5 +1,11 @@
 %% Helper Function: Open New Simulation Window
 function openNewSimulation(mainFigHandle)
+    persistent projectSetupChecked
+    if isempty(projectSetupChecked)
+        run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+        projectSetupChecked = true;
+    end
+
     % Hide the Main Window
     mainFigHandle.Visible = 'off';
 

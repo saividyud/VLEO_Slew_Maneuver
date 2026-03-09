@@ -1,4 +1,6 @@
 %Testing the sat template
+run(fullfile(fileparts(mfilename('fullpath')), 'ensure_project_setup.m'));
+
 Xi = [0, 0, 6678e3, -7789, 0, 0,0.7860666, 0.1675188, 0.5709415, 0.1675188,0,0,0]';
 Xr = [1 ; 0 ; 0 ; 0 ; 0 ; 0 ; 0]; 
 options = odeset('MaxStep',1);
