@@ -14,7 +14,7 @@ Computationally determining the feasibility of using ion thrusters for slew mane
 ├── tests/              # Unit tests and verification scripts
 ├── examples/           # Examples for custom repo functions and demos
 ├── docs/               # Documentation and theory
-│   └── theory.md       # Mathematical foundations and citations
+│   └── theory.tex      # Mathematical foundations and citations
 ├── data/               # Shared data files (TLE, ephemeris)
 └── workspaces/         # Personal development sandboxes
     ├── Nill/
@@ -48,7 +48,7 @@ See [PROJECT_STANDARDS.md](PROJECT_STANDARDS.md) for complete guidelines.
 Before merging code to `src/`:
 - [ ] Test file in `tests/`
 - [ ] Example file in `examples/` for each new custom repo function
-- [ ] Theory documented in `docs/theory.md`
+- [ ] Theory documented in `docs/theory.tex`
 - [ ] No magic numbers
 - [ ] SI units throughout
 

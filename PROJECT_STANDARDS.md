@@ -119,7 +119,7 @@ w = [wx; wy; wz];              % w in what frame?
 **Exception**: Loop indices (`i`, `j`, `k`) and temporary variables in limited scope.
 
 ### 2.4 Theory Documentation
-All physics, engineering, and mathematical theory used in `src/` functions **MUST** be documented in `docs/theory.md`.
+All physics, engineering, and mathematical theory used in `src/` functions **MUST** be documented in `docs/theory.tex`.
 
 Each theory entry **SHALL** include:
 - Name/title of the concept
@@ -341,7 +341,7 @@ function [output1, output2] = function_name(input1, input2, options)
 %       output2 - Description, units, dimensions [-], scalar
 %
 %   Theory:
-%       Brief explanation or reference to docs/theory.md section
+%       Brief explanation or reference to docs/theory.tex section
 %
 %   Example:
 %       [v, a] = function_name([1e6; 0; 0], 0.5);
@@ -420,7 +420,7 @@ Types:
 ```
 Add: J3 perturbation model in dynamics
 Fix: Handle circular-orbit singularity in state-to-elements conversion
-Docs: Update theory.md with quaternion kinematics derivation
+Docs: Update theory.tex with quaternion kinematics derivation
 Test: Add quaternion conversion verification against Vallado examples
 ```
 
@@ -444,7 +444,7 @@ Before requesting review:
 - [ ] Units are SI (Section 3.3)
 - [ ] Test file exists in `tests/`
 - [ ] Example file exists in `examples/` for each new custom repo function
-- [ ] Theory added to `docs/theory.md` (if new physics)
+- [ ] Theory added to `docs/theory.tex` (if new physics)
 - [ ] Code runs without errors
 - [ ] Edge cases handled
 

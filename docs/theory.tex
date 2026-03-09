@@ -1,0 +1,529 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  pdftitle={Theoretical Foundations for VLEO Slew Maneuver}
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+\newcommand{\transpose}{\mathsf{T}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\diag}{\operatorname{diag}}
+
+\title{Theoretical Foundations\\\large VLEO Slew Maneuver}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Coordinate Transformations}
+
+\subsection{Quaternion to Direction Cosine Matrix}
+
+A quaternion $\vect{q} = [q_0\; q_1\; q_2\; q_3]^\transpose$ using the
+scalar-first convention can be converted to a direction cosine matrix
+through
+
+\begin{equation}
+\mathbf{C}(\vect{q}) =
+\begin{bmatrix}
+q_0^2 + q_1^2 - q_2^2 - q_3^2 & 2(q_1 q_2 + q_0 q_3) & 2(q_1 q_3 - q_0 q_2) \\
+2(q_1 q_2 - q_0 q_3) & q_0^2 - q_1^2 + q_2^2 - q_3^2 & 2(q_2 q_3 + q_0 q_1) \\
+2(q_1 q_3 + q_0 q_2) & 2(q_2 q_3 - q_0 q_1) & q_0^2 - q_1^2 - q_2^2 + q_3^2
+\end{bmatrix}.
+\end{equation}
+
+\textbf{Source.} Wertz, J. R., \emph{Spacecraft Attitude Determination and
+Control}, 1978, Eq. 12-12.
+
+\textbf{Implemented in.} Aerospace Toolbox \texttt{quat2dcm}, used in
+\texttt{src/Sat\_template.m}, \texttt{src/sat\_template\_gui.m},
+\texttt{src/gui/AttitudeAnimator.m},
+\texttt{src/gui/AttitudeAnimatorGUI.m}, and
+\texttt{src/computeAeroForces.m}.
+
+\subsection{Direction Cosine Matrix to Quaternion}
+
+The inverse transformation uses Shepperd's method for numerical
+stability:
+
+\begin{enumerate}[label=\arabic*.]
+\item Compute the matrix trace and diagonal elements.
+\item Find the maximum of $\{\operatorname{tr}(\mathbf{C}), C_{11}, C_{22}, C_{33}\}$.
+\item Use the corresponding extraction formula to avoid division by a
+small number.
+\end{enumerate}
+
+\textbf{Source.} Shepperd, S. W., ``Quaternion from Rotation Matrix,''
+\emph{Journal of Guidance and Control}, Vol. 1, No. 3, 1978.
+
+\textbf{Implemented in.} Aerospace Toolbox \texttt{dcm2quat}, used in
+\texttt{src/Reference\_Trajectory\_Calculation.m} and
+\texttt{src/gui/runSimulation.m}.
+
+\subsection{Quaternion and Principal Axis-Angle}
+
+Quaternion from axis-angle:
+
+\begin{equation}
+q_0 = \cos\left(\frac{\theta}{2}\right), \qquad
+q_1 = e_1 \sin\left(\frac{\theta}{2}\right), \qquad
+q_2 = e_2 \sin\left(\frac{\theta}{2}\right), \qquad
+q_3 = e_3 \sin\left(\frac{\theta}{2}\right).
+\end{equation}
+
+Here $\vect{e} = [e_1\; e_2\; e_3]^\transpose$ is the unit rotation axis
+and $\theta$ is the rotation angle.
+
+Axis-angle from quaternion:
+
+\begin{equation}
+\theta = 2 \cos^{-1}(q_0),
+\end{equation}
+
+with
+
+\begin{equation}
+\vect{e} =
+\begin{cases}
+\dfrac{1}{\sin(\theta/2)} [q_1\; q_2\; q_3]^\transpose, & \theta \neq 0, \\
+[1\; 0\; 0]^\transpose, & \theta = 0.
+\end{cases}
+\end{equation}
+
+\textbf{Source.} Euler's rotation theorem; Kuipers, J.,
+\emph{Quaternions and Rotation Sequences}, 1999.
+
+\textbf{Implemented in.} No current \texttt{src/} implementation. If
+principal-axis-angle support is needed again, add it back as a documented
+custom repository function.
+
+\subsection{Fundamental Rotation Matrices}
+
+Elementary rotations about the principal axes are
+
+\begin{align}
+\mathbf{R}_1(\theta) &=
+\begin{bmatrix}
+1 & 0 & 0 \\
+0 & \cos\theta & \sin\theta \\
+0 & -\sin\theta & \cos\theta
+\end{bmatrix}, \\
+\mathbf{R}_2(\theta) &=
+\begin{bmatrix}
+\cos\theta & 0 & -\sin\theta \\
+0 & 1 & 0 \\
+\sin\theta & 0 & \cos\theta
+\end{bmatrix}, \\
+\mathbf{R}_3(\theta) &=
+\begin{bmatrix}
+\cos\theta & \sin\theta & 0 \\
+-\sin\theta & \cos\theta & 0 \\
+0 & 0 & 1
+\end{bmatrix}.
+\end{align}
+
+\textbf{Source.} Schaub, H. and Junkins, J., \emph{Analytical Mechanics
+of Space Systems}, 4th ed., 2018, Ch. 3.
+
+\textbf{Implemented in.} No dedicated \texttt{src/} helper. Current
+\texttt{src/} code uses Aerospace Toolbox rotation and conversion
+utilities instead of a local elementary-rotation wrapper.
+
+\section{Orbital Mechanics}
+
+\subsection{Orbital Elements from Position and Velocity}
+
+Given inertial position $\vect{r}$ and velocity $\vect{v}$, the classical
+orbital elements are computed through
+
+\begin{enumerate}[label=\arabic*.]
+\item Specific angular momentum:
+\begin{equation}
+\vect{h} = \vect{r} \times \vect{v}.
+\end{equation}
+
+\item Node vector:
+\begin{equation}
+\vect{n} = [0\; 0\; 1]^\transpose \times \vect{h}.
+\end{equation}
+
+\item Eccentricity vector:
+\begin{equation}
+\vect{e} = \frac{\left(\norm{\vect{v}}^2 - \mu / \norm{\vect{r}}\right)\vect{r} - (\vect{r} \cdot \vect{v})\vect{v}}{\mu}.
+\end{equation}
+
+\item Specific orbital energy:
+\begin{equation}
+\epsilon = \frac{\norm{\vect{v}}^2}{2} - \frac{\mu}{\norm{\vect{r}}}.
+\end{equation}
+
+\item Semi-major axis:
+\begin{equation}
+a = -\frac{\mu}{2\epsilon}.
+\end{equation}
+
+\item Inclination:
+\begin{equation}
+i = \cos^{-1}\left(\frac{h_z}{\norm{\vect{h}}}\right).
+\end{equation}
+
+\item Right ascension of the ascending node:
+\begin{equation}
+\Omega = \cos^{-1}\left(\frac{n_x}{\norm{\vect{n}}}\right),
+\end{equation}
+with the quadrant selected from the sign of $n_y$.
+
+\item Argument of periapsis:
+\begin{equation}
+\omega = \cos^{-1}\left(\frac{\vect{n} \cdot \vect{e}}{\norm{\vect{n}}\norm{\vect{e}}}\right),
+\end{equation}
+with the quadrant selected from the sign of $e_z$.
+
+\item True anomaly:
+\begin{equation}
+f = \cos^{-1}\left(\frac{\vect{e} \cdot \vect{r}}{\norm{\vect{e}}\norm{\vect{r}}}\right),
+\end{equation}
+with the quadrant selected from the sign of $\vect{r} \cdot \vect{v}$.
+\end{enumerate}
+
+\textbf{Special cases.}
+\begin{itemize}
+\item Circular orbits ($e \approx 0$): use the argument of latitude
+$u = \omega + f$.
+\item Equatorial orbits ($i \approx 0$): use the longitude of periapsis
+$\varpi = \Omega + \omega$.
+\end{itemize}
+
+\textbf{Source.} Vallado, D. A., \emph{Fundamentals of Astrodynamics and
+Applications}, 4th ed., 2013, Algorithm 9.
+
+\textbf{Implemented in.} Aerospace Toolbox \texttt{ijk2keplerian} when
+state-to-elements conversion is needed.
+
+\subsection{Position and Velocity from Orbital Elements}
+
+First compute the position and velocity in the perifocal frame:
+
+\begin{align}
+\vect{r}_{\mathrm{PQW}} &= \frac{a(1-e^2)}{1 + e\cos f}
+\begin{bmatrix}
+\cos f \\
+\sin f \\
+0
+\end{bmatrix}, \\
+\vect{v}_{\mathrm{PQW}} &= \sqrt{\frac{\mu}{a(1-e^2)}}
+\begin{bmatrix}
+-\sin f \\
+e + \cos f \\
+0
+\end{bmatrix}.
+\end{align}
+
+Then transform to the ECI frame with
+
+\begin{align}
+\mathbf{R} &= \mathbf{R}_3(-\Omega)\mathbf{R}_1(-i)\mathbf{R}_3(-\omega), \\
+\vect{r}_{\mathrm{ECI}} &= \mathbf{R}\vect{r}_{\mathrm{PQW}}, \\
+\vect{v}_{\mathrm{ECI}} &= \mathbf{R}\vect{v}_{\mathrm{PQW}}.
+\end{align}
+
+\textbf{Source.} Vallado, D. A., \emph{Fundamentals of Astrodynamics and
+Applications}, 4th ed., 2013, Algorithm 10.
+
+\textbf{Implemented in.} Aerospace Toolbox \texttt{keplerian2ijk}, used
+in \texttt{src/Reference\_Trajectory\_Calculation.m},
+\texttt{src/gui/runSimulation.m}, and
+\texttt{src/gui/AttitudeAnimator.m}.
+
+\section{Attitude Dynamics}
+
+\subsection{Quaternion Kinematics}
+
+The time derivative of the quaternion representing body orientation is
+
+\begin{equation}
+\dot{\vect{q}} = \frac{1}{2}\,\mathbf{\Omega}(\vect{\omega})\vect{q},
+\end{equation}
+
+where the quaternion rate matrix is
+
+\begin{equation}
+\mathbf{\Omega}(\vect{\omega}) =
+\begin{bmatrix}
+0 & -\omega_1 & -\omega_2 & -\omega_3 \\
+\omega_1 & 0 & \omega_3 & -\omega_2 \\
+\omega_2 & -\omega_3 & 0 & \omega_1 \\
+\omega_3 & \omega_2 & -\omega_1 & 0
+\end{bmatrix}.
+\end{equation}
+
+Here $\vect{\omega} = [\omega_1\; \omega_2\; \omega_3]^\transpose$ is
+the angular velocity of the body frame relative to the inertial frame,
+expressed in body coordinates.
+
+\textbf{Source.} Wertz, J. R., \emph{Spacecraft Attitude Determination and
+Control}, 1978, Section 12.1.
+
+\textbf{Implemented in.} \texttt{src/Sat\_template.m}.
+
+\subsection{Euler's Rotational Equations}
+
+For a rigid body with inertia tensor $\mathbf{J}$,
+
+\begin{equation}
+\mathbf{J}\dot{\vect{\omega}} = -\vect{\omega} \times (\mathbf{J}\vect{\omega}) + \vect{T}_{\mathrm{ext}}.
+\end{equation}
+
+For a diagonal inertia tensor $\mathbf{J} = \diag([J_x, J_y, J_z])$,
+
+\begin{align}
+J_x \dot{\omega}_x &= (J_y - J_z)\omega_y\omega_z + T_x, \\
+J_y \dot{\omega}_y &= (J_z - J_x)\omega_z\omega_x + T_y, \\
+J_z \dot{\omega}_z &= (J_x - J_y)\omega_x\omega_y + T_z.
+\end{align}
+
+\textbf{Source.} Schaub, H. and Junkins, J., \emph{Analytical Mechanics
+of Space Systems}, 4th ed., 2018, Ch. 4.
+
+\textbf{Implemented in.} \texttt{src/Sat\_template.m}.
+
+\subsection{PD Attitude Control Law}
+
+Quaternion-based feedback control is written as
+
+\begin{equation}
+\vect{T}_{\mathrm{control}} = -\mathbf{K}_p\vect{q}_{\mathrm{error},v} - \mathbf{K}_d\vect{\omega}_{\mathrm{error}},
+\end{equation}
+
+where
+
+\begin{itemize}
+\item $\vect{q}_{\mathrm{error},v}$ is the vector part of the attitude
+error quaternion,
+\item $\vect{\omega}_{\mathrm{error}}$ is the angular velocity error,
+\item $\mathbf{K}_p$ is the proportional gain matrix, and
+\item $\mathbf{K}_d$ is the derivative gain matrix.
+\end{itemize}
+
+\textbf{Source.} Wie, B., \emph{Space Vehicle Dynamics and Control}, 2nd
+ed., 2008, Ch. 7.
+
+\textbf{Implemented in.} \texttt{src/controllers/control\_torques.m}.
+
+\section{Perturbations}
+
+\subsection{J2 Perturbation (Earth Oblateness)}
+
+The acceleration due to Earth's $J_2$ zonal harmonic is
+
+\begin{equation}
+\vect{a}_{J_2} = \frac{3}{2} J_2 \frac{\mu}{r^2} \left(\frac{R_E}{r}\right)^2
+\begin{bmatrix}
+\left(\dfrac{x}{r}\right)\left(5\left(\dfrac{z}{r}\right)^2 - 1\right) \\
+\left(\dfrac{y}{r}\right)\left(5\left(\dfrac{z}{r}\right)^2 - 1\right) \\
+\left(\dfrac{z}{r}\right)\left(5\left(\dfrac{z}{r}\right)^2 - 3\right)
+\end{bmatrix}.
+\end{equation}
+
+Here $J_2 = 1.08263 \times 10^{-3}$ is dimensionless,
+$R_E = 6378137\,\mathrm{m}$ is the Earth's equatorial radius,
+$\mu = 3.986004418 \times 10^{14}\,\mathrm{m}^3/\mathrm{s}^2$ is the
+Earth gravitational parameter, and $r = \norm{\vect{r}}$ is the distance
+from the Earth's center.
+
+\textbf{Source.} Vallado, D. A., \emph{Fundamentals of Astrodynamics and
+Applications}, 4th ed., 2013, Eq. 8-25.
+
+\textbf{Implemented in.} Aerospace Toolbox \texttt{gravityzonal}, used in
+\texttt{src/Sat\_template.m} and \texttt{src/sat\_template\_gui.m}.
+
+\subsection{J3 Perturbation}
+
+The acceleration due to Earth's $J_3$ zonal harmonic is
+
+\begin{equation}
+\vect{a}_{J_3} = \frac{1}{2} J_3 \frac{\mu}{r^2} \left(\frac{R_E}{r}\right)^3
+\begin{bmatrix}
+\left(\dfrac{x}{r}\right)\left(10\left(\dfrac{z}{r}\right)^3 - 15\left(\dfrac{z}{r}\right)\right) \\
+\left(\dfrac{y}{r}\right)\left(10\left(\dfrac{z}{r}\right)^3 - 15\left(\dfrac{z}{r}\right)\right) \\
+4\left(\dfrac{z}{r}\right)^3 - 3\left(\dfrac{z}{r}\right)
+\end{bmatrix},
+\end{equation}
+
+with $J_3 = -2.5327 \times 10^{-6}$.
+
+\textbf{Source.} Vallado, D. A., \emph{Fundamentals of Astrodynamics and
+Applications}, 4th ed., 2013, Eq. 8-26.
+
+\textbf{Implemented in.} Aerospace Toolbox \texttt{gravityzonal}, used in
+\texttt{src/Sat\_template.m} and \texttt{src/sat\_template\_gui.m}.
+
+\subsection{Atmospheric Drag in VLEO}
+
+The drag acceleration model is
+
+\begin{equation}
+\vect{a}_{\mathrm{drag}} = -\frac{1}{2} \rho C_d \frac{A}{m}
+\norm{\vect{v}_{\mathrm{rel}}}\vect{v}_{\mathrm{rel}}.
+\end{equation}
+
+Here $\rho$ is the atmospheric density, $C_d$ is the drag coefficient,
+$A$ is the cross-sectional area, $m$ is the spacecraft mass, and
+$\vect{v}_{\mathrm{rel}}$ is the velocity relative to the atmosphere.
+
+\textbf{Atmospheric models.}
+\begin{itemize}
+\item Exponential atmosphere (simple)
+\item NRLMSISE-00 (high fidelity)
+\item JB2008 (operational)
+\end{itemize}
+
+\textbf{Source.} Vallado, D. A., \emph{Fundamentals of Astrodynamics and
+Applications}, 4th ed., 2013, Ch. 8.6.
+
+\textbf{Implemented in.} \texttt{src/computeAeroForces.m}, which evaluates
+NRLMSISE-00 using geodetic coordinates resolved from either direct
+latitude/longitude inputs or the spacecraft ECI position and simulation
+time. The resulting forces and moments are applied in
+\texttt{src/Sat\_template.m}, \texttt{src/sat\_template\_gui.m}, and
+\texttt{src/gui/runSimulation.m}.
+
+\subsection{Solar Radiation Pressure}
+
+The solar radiation pressure acceleration model is
+
+\begin{equation}
+\vect{a}_{\mathrm{SRP}} = -P_{\mathrm{sr}} C_r \frac{A}{m}
+\frac{\vect{r}_{\mathrm{sun}}}{\norm{\vect{r}_{\mathrm{sun}}}}.
+\end{equation}
+
+Here $P_{\mathrm{sr}} \approx 4.56 \times 10^{-6}\,\mathrm{N/m}^2$ at
+1 AU, $C_r$ is the reflectivity coefficient, $A$ is the illuminated area,
+and $\vect{r}_{\mathrm{sun}}$ is the position vector from the spacecraft to
+the Sun.
+
+\textbf{Source.} Montenbruck, O. and Gill, E., \emph{Satellite Orbits},
+2000, Ch. 3.4.
+
+\textbf{Implemented in.} \texttt{src/computeAeroForces.m}, which computes
+panel-wise solar coefficients and returns total solar force and moment
+contributions for the active spacecraft mesh.
+
+\section{Propulsion}
+
+\subsection{Ion Thruster Fundamentals}
+
+The thrust relation is
+
+\begin{equation}
+F = \dot{m} v_e = \dot{m} g_0 I_{sp},
+\end{equation}
+
+where $F$ is thrust, $\dot{m}$ is mass flow rate, $v_e$ is exhaust
+velocity, $g_0 = 9.80665\,\mathrm{m/s}^2$ is standard gravity, and
+$I_{sp}$ is specific impulse.
+
+The corresponding power-thrust relation is
+
+\begin{equation}
+P = \frac{1}{2} \dot{m} v_e^2 \frac{1}{\eta},
+\end{equation}
+
+where $\eta$ is the thruster efficiency.
+
+\textbf{Source.} Goebel, D. and Katz, I., \emph{Fundamentals of Electric
+Propulsion: Ion and Hall Thrusters}, JPL, 2008.
+
+\textbf{Implemented in.} TBD.
+
+\subsection{Slew Maneuver Analysis}
+
+For a rest-to-rest slew maneuver of angle $\theta$, the minimum-time
+bang-bang control result is
+
+\begin{equation}
+t_{\min} = 2\sqrt{\frac{\theta J}{T_{\max}}},
+\end{equation}
+
+and a smooth minimum-energy form is written as
+
+\begin{equation}
+E_{\min} = \frac{4}{3} \frac{J\theta^2}{t^3}.
+\end{equation}
+
+Here $J$ is the moment of inertia about the rotation axis and
+$T_{\max}$ is the maximum available torque.
+
+\textbf{Source.} Wie, B., \emph{Space Vehicle Dynamics and Control}, 2nd
+ed., 2008, Ch. 7.
+
+\textbf{Implemented in.} TBD.
+
+\section{References}
+
+\subsection{Textbooks}
+
+\begin{enumerate}[label=\arabic*.]
+\item Vallado, D. A. (2013). \emph{Fundamentals of Astrodynamics and
+Applications}, 4th ed. Microcosm Press.
+\item Wertz, J. R. (1978). \emph{Spacecraft Attitude Determination and
+Control}. Kluwer Academic Publishers.
+\item Schaub, H. and Junkins, J. (2018). \emph{Analytical Mechanics of
+Space Systems}, 4th ed. AIAA.
+\item Wie, B. (2008). \emph{Space Vehicle Dynamics and Control}, 2nd ed.
+AIAA.
+\item Montenbruck, O. and Gill, E. (2000). \emph{Satellite Orbits:
+Models, Methods, and Applications}. Springer.
+\item Kuipers, J. (1999). \emph{Quaternions and Rotation Sequences}.
+Princeton University Press.
+\item Goebel, D. and Katz, I. (2008). \emph{Fundamentals of Electric
+Propulsion: Ion and Hall Thrusters}. JPL/Wiley.
+\end{enumerate}
+
+\subsection{Papers}
+
+\begin{enumerate}[label=\arabic*.]
+\setcounter{enumi}{7}
+\item Shepperd, S. W. (1978). ``Quaternion from Rotation Matrix.''
+\emph{Journal of Guidance and Control}, Vol. 1, No. 3.
+\end{enumerate}
+
+\subsection{Standards}
+
+\begin{enumerate}[label=\arabic*.]
+\setcounter{enumi}{8}
+\item IERS Conventions (2010). IERS Technical Note No. 36.
+\item WGS84 (2014). NGA.STND.0036\_1.0.0\_WGS84.
+\end{enumerate}
+
+\section*{Document History}
+\addcontentsline{toc}{section}{Document History}
+
+\begin{tabular}{@{}lll@{}}
+\toprule
+Date & Author & Changes \\
+\midrule
+2025-12-30 & Team & Initial template with existing implementations \\
+\bottomrule
+\end{tabular}
+
+\end{document}
