@@ -51,19 +51,12 @@ function Xd = Sat_template(t,X)
     %% Compute aerodynamic forces and moments
     % Constants
     mu = 3.986e14;          % Earth gravitational parameter [m^3/s^2]
-    R_E = 6.37813649e6;     % Earth equatorial radius [m]
     
     r = norm(X(1:3));       % Distance from Earth center [m]
-    
-    % Convert ECI position to geodetic coordinates
-    altitude = r - R_E;                           % Altitude [m] (spherical approx)
-    latitude = asind(X(3)/r);                     % Latitude [deg]
-    longitude = atan2d(X(2), X(1));               % Longitude [deg]
-    
-    % Set up location structure for computeAeroForces
-    location.altitude = altitude;
-    location.latitude = latitude;
-    location.longitude = longitude;
+
+    % Provide the inertial position directly so computeAeroForces can
+    % resolve the Earth-fixed geodetic coordinates before the atmosphere lookup.
+    location.positionECI = X(1:3);
     
     % Compute angle of attack and sideslip from velocity and attitude
     % First, get velocity in body frame using quaternion
@@ -93,6 +86,7 @@ function Xd = Sat_template(t,X)
     
     % Set up time structure (using simulation time)
     % Assuming simulation starts at day 106 (mid-April)
+    time.year = 2002;
     time.dayOfYear = 106 + floor(t / 86400);     % Day of year
     time.UTseconds = mod(t, 86400);              % Seconds of the day
     

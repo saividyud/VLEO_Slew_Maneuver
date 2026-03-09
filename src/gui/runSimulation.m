@@ -189,6 +189,13 @@ function simParams = ensureSimulationDefaults(simParams)
         simParams.initParams.Environment.gasSurfaceInteractionModel = 'cook';
     end
 
+    simParams.initParams.Environment.gasSurfaceInteractionModel = ...
+        normalizeGsiModelValue(simParams.initParams.Environment.gasSurfaceInteractionModel);
+
+    if ~isfield(simParams.initParams.Environment, 'year')
+        simParams.initParams.Environment.year = 2002;
+    end
+
     if ~isfield(simParams.initParams, 'Controller')
         simParams.initParams.Controller = struct();
     end
@@ -256,9 +263,7 @@ function tauAero = evaluateAeroTorque(simParams, t, X)
     thisFilePath = fileparts(mfilename('fullpath'));
     objFilePath = fullfile(thisFilePath, '..', 'dynamics', '6U CubeSat.obj');
 
-    location.altitude = r - 6378.14e3;
-    location.latitude = asind(X(3) / r);
-    location.longitude = atan2d(X(2), X(1));
+    location.positionECI = X(1:3);
 
     q = X(7:10);
     v_eci = X(4:6);
@@ -277,6 +282,7 @@ function tauAero = evaluateAeroTorque(simParams, t, X)
 
     day_start = getEnvValue(simParams, 'dayOfYear', 1);
     seconds_start = getEnvValue(simParams, 'secondsOfDay', 0);
+    time.year = getEnvValue(simParams, 'year', 2002);
     time.dayOfYear = day_start + floor((seconds_start + t) / 86400);
     time.UTseconds = mod(seconds_start + t, 86400);
 
@@ -284,7 +290,7 @@ function tauAero = evaluateAeroTorque(simParams, t, X)
     aeroOptions.f107Daily = getEnvValue(simParams, 'F107Daily', 150);
     aeroOptions.magneticIndex = getEnvValue(simParams, 'magneticIndices', ones(1, 7) * 3);
     aeroOptions.anomalousOxygen = getEnvValue(simParams, 'enableAnomalousOxygen', false);
-    aeroOptions.gsi_model = getEnvValue(simParams, 'gasSurfaceInteractionModel', 'cook');
+    aeroOptions.gsi_model = normalizeGsiModelValue(getEnvValue(simParams, 'gasSurfaceInteractionModel', 'cook'));
     aeroOptions.alpha = getEnvValue(simParams, 'accommodationCoefficient', 1);
     aeroOptions.Tw = getEnvValue(simParams, 'wallTemperature', 300);
     aeroOptions.enableShadow = getEnvValue(simParams, 'enableShadowAnalysis', true);
@@ -373,5 +379,12 @@ function enabled = getModeFlag(simParams, fieldName, defaultValue)
 
     if isfield(simParams.initParams.Modes, fieldName)
         enabled = logical(simParams.initParams.Modes.(fieldName));
+    end
+end
+
+function modelName = normalizeGsiModelValue(modelName)
+    modelName = lower(char(modelName));
+    if ~any(strcmp(modelName, {'cook', 'sentman'}))
+        modelName = 'cook';
     end
 end

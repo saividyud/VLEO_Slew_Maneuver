@@ -281,7 +281,7 @@ Where:
 
 **Source**: Vallado, D. A., "Fundamentals of Astrodynamics and Applications", 4th ed., 2013, Ch. 8.6
 
-**Implemented in**: `workspaces/Nill/testing_ground/atmospheric_drag.m` (under development)
+**Implemented in**: `src/computeAeroForces.m`, which evaluates NRLMSISE-00 using geodetic coordinates resolved from either direct latitude/longitude inputs or the spacecraft ECI position and simulation time. The resulting forces and moments are applied in `src/Sat_template.m`, `src/sat_template_gui.m`, and `src/gui/runSimulation.m`.
 
 ---
 
@@ -299,7 +299,7 @@ Where:
 
 **Source**: Montenbruck, O. and Gill, E., "Satellite Orbits", 2000, Ch. 3.4
 
-**Implemented in**: `workspaces/Nill/testing_ground/solar_radiation_pressure.m` (under development)
+**Implemented in**: `src/computeAeroForces.m`, which computes panel-wise solar coefficients and returns total solar force and moment contributions for the active spacecraft mesh.
 
 ---
 

@@ -66,20 +66,11 @@ function Xd = sat_template_gui(t, X, subFigHandle)
     enableControl = getModeFlag(simParams, 'enableControl', true);
 
     %% Compute aerodynamic forces and moments
-    % Constants
-    R_E = 6378.14e3;       % Earth equatorial radius [m]
-    
     r = norm(X(1:3));       % Distance from Earth center [m]
-    
-    % Convert ECI position to geodetic coordinates
-    altitude = r - R_E;                           % Altitude [m] (spherical approx)
-    latitude = asind(X(3)/r);                     % Latitude [deg]
-    longitude = atan2d(X(2), X(1));               % Longitude [deg]
-    
-    % Set up location structure for computeAeroForces
-    location.altitude = altitude;
-    location.latitude = latitude;
-    location.longitude = longitude;
+
+    % Provide the inertial position directly so computeAeroForces can
+    % resolve the Earth-fixed geodetic coordinates before the atmosphere lookup.
+    location.positionECI = X(1:3);
     
     % Compute angle of attack and sideslip from velocity and attitude
     % First, get velocity in body frame using quaternion
@@ -109,6 +100,7 @@ function Xd = sat_template_gui(t, X, subFigHandle)
     
     % Set up time structure (using simulation time)
     % Assuming simulation starts at day 106 (mid-April)
+    time.year = getEnvValue(simParams, 'year', 2002);
     time.dayOfYear = day_start + floor((seconds_start + t)/86400);
     time.UTseconds = mod(seconds_start + t, 86400);
     
@@ -202,6 +194,18 @@ function Xd = sat_template_gui(t, X, subFigHandle)
     
     % Xdot = AX + Bu, B changes with the type of actuator we use
 
+end
+
+function value = getEnvValue(simParams, fieldName, defaultValue)
+    value = defaultValue;
+
+    if ~isfield(simParams, 'initParams') || ~isfield(simParams.initParams, 'Environment')
+        return;
+    end
+
+    if isfield(simParams.initParams.Environment, fieldName)
+        value = simParams.initParams.Environment.(fieldName);
+    end
 end
 
 function enabled = getModeFlag(simParams, fieldName, defaultValue)

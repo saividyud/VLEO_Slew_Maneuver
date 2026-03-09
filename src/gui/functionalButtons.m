@@ -1375,12 +1375,16 @@ function setEnvironmentalParameters(subFigHandle)
     lblGSI.Layout.Row = 4;
     lblGSI.Layout.Column = 7;
     entryGSI = uidropdown(subGl);
-    entryGSI.Items = {'cook'};
+    entryGSI.Items = {'cook', 'sentman'};
     entryGSI.FontName = 'Times New Roman';
     entryGSI.FontSize = 14;
     entryGSI.Layout.Row = 4;
     entryGSI.Layout.Column = 6;
-    entryGSI.Value = simParams.initParams.Environment.gasSurfaceInteractionModel; % Default to cook
+    if any(strcmpi(simParams.initParams.Environment.gasSurfaceInteractionModel, entryGSI.Items))
+        entryGSI.Value = lower(char(simParams.initParams.Environment.gasSurfaceInteractionModel));
+    else
+        entryGSI.Value = 'cook';
+    end
 
     % Accommodation coefficient
     lblAccom = uilabel(subGl, 'Text', 'Accommodation coefficient');

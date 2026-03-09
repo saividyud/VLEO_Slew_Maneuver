@@ -56,3 +56,9 @@ Before merging code to `src/`:
 
 - Nill
 - Sai Vidyud
+
+## License
+
+This repository is licensed under the GNU General Public License, version 3 or later (`GPL-3.0-or-later`). See `LICENSE`.
+
+Parts of the aerodynamic modeling workflow are adapted from ADBSat, which is also distributed under GPL-3.0-compatible terms. See `THIRD_PARTY_LICENSES.md` for attribution and compliance notes.

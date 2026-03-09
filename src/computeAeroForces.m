@@ -7,24 +7,28 @@ function [results] = computeAeroForces(objFilePath, location, attitude, time, op
 %
 % Inputs:
 %   objFilePath : Path to .obj mesh file (string)
-%   location    : Structure with fields:000000
-%                   .altitude   - Altitude [m]
-%                   .latitude   - Geodetic latitude [deg]
-%                   .longitude  - Longitude [deg]
+%   location    : Structure with either:
+%                   .altitude    - Altitude [m]
+%                   .latitude    - Geodetic latitude [deg]
+%                   .longitude   - Longitude [deg]
+%                 OR:
+%                   .positionECI - ECI position vector [m]
 %   attitude    : Structure with fields:
 %                   .aoa        - Angle of attack [deg]
 %                   .aos        - Angle of sideslip [deg]
 %                 OR (alternative representation):
 %                   .quaternion - [q0, q1, q2, q3] attitude quaternion (body to wind)
 %   time        : Structure with fields:
-%                   .dayOfYear  - Day of year (1-365)
+%                   .year       - Calendar year (default: 2002)
+%                   .dayOfYear  - Day of year (1-366)
 %                   .UTseconds  - Seconds of the day (0-86400)
 %   options     : (Optional) Structure with fields:
 %                   .f107Average    - 81-day average F10.7 flux (default: 150)
 %                   .f107Daily      - Daily F10.7 flux (default: 150)
 %                   .magneticIndex  - 7-element Ap array (default: ones(1,7)*3)
 %                   .anomalousOxygen- Flag for anomalous oxygen (default: 0)
-%                   .gsi_model      - GSI model name (default: 'cook')
+%                   .gsi_model      - GSI model name: 'cook' or 'sentman'
+%                                     (default: 'cook'; legacy 'DRIA' maps to 'sentman')
 %                   .alpha          - Accommodation coefficient (default: 1)
 %                   .Tw             - Wall temperature [K] (default: 300)
 %                   .enableShadow   - Enable shadow analysis (default: 1)
@@ -32,8 +36,6 @@ function [results] = computeAeroForces(objFilePath, location, attitude, time, op
 %                   .sol_cR         - Specular reflectivity (default: 0.15)
 %                   .sol_cD         - Diffuse reflectivity (default: 0.25)
 %
-% Outputs:.F_aero     - Aerodynamic force vector [N] in wind frame
-%                   .M_aero     - Aerodynamic moment vector [N*m] in body frame
 %   results     : Structure with fields:
 %                   .Cf_w       - Force coefficient in wind frame [3x1]
 %                   .Cf_f       - Force coefficient in flight frame [3x1]
@@ -46,7 +48,10 @@ function [results] = computeAeroForces(objFilePath, location, attitude, time, op
 %                   .LenRef     - Reference length [m]
 %                   .rho        - Atmospheric density [kg/m^3]
 %                   .vinf       - Free-stream velocity [m/s]
-%                   
+%                   .location    - Resolved geodetic location [m, deg, deg]
+%                   .time        - Normalized time used for atmosphere lookups
+%                   .F_aero      - Aerodynamic force vector [N] in wind frame
+%                   .M_aero      - Aerodynamic moment vector [N*m] in body frame
 %                   .F_solar    - Solar force vector [N] in wind frame (if enabled)
 %                   .M_solar    - Solar moment vector [N*m] in body frame (if enabled)
 %                   .param_eq   - Full parameter structure used in calculations
@@ -58,6 +63,7 @@ function [results] = computeAeroForces(objFilePath, location, attitude, time, op
 %   location.longitude = 0;
 %   attitude.aoa = 0;
 %   attitude.aos = 0;
+%   time.year = 2002;
 %   time.dayOfYear = 106;
 %   time.UTseconds = 0;
 %   results = computeAeroForces(objFile, location, attitude, time);
@@ -92,19 +98,29 @@ if ~isfield(options, 'enableSolar'),     options.enableSolar = 1; end
 if ~isfield(options, 'sol_cR'),          options.sol_cR = 0.15; end
 if ~isfield(options, 'sol_cD'),          options.sol_cD = 0.25; end
 
+time = normalizeTimeInputs(time);
+location = resolveLocation(location, time);
+gsiModel = normalizeGsiModel(options.gsi_model);
+
 %% Step 1: Import mesh directly (without saving to file)
 meshdata = importMeshDirect(objFilePath);
 
 %% Step 2: Setup parameter structure
-param_eq.gsi_model = options.gsi_model;
-param_eq.alpha = options.alpha;
+param_eq.gsi_model = gsiModel;
+switch gsiModel
+    case {'cook', 'sentman'}
+        param_eq.alpha = options.alpha;
+    otherwise
+        error('computeAeroForces:UnsupportedGsiModel', ...
+            'Supported gsi_model values are ''cook'' and ''sentman''.')
+end
 param_eq.Tw = options.Tw;
 param_eq.sol_cR = options.sol_cR;
 param_eq.sol_cD = options.sol_cD;
 
 %% Step 3: Compute environment parameters
 param_eq = computeEnvironment(param_eq, location.altitude, location.latitude, ...
-    location.longitude, time.dayOfYear, time.UTseconds, ...
+    location.longitude, time.year, time.dayOfYear, time.UTseconds, ...
     options.f107Average, options.f107Daily, options.magneticIndex, ...
     options.anomalousOxygen);
 
@@ -143,6 +159,8 @@ end
 % Store additional info
 results.rho = rho_total;
 results.vinf = param_eq.vinf;
+results.location = location;
+results.time = time;
 results.param_eq = param_eq;
 
 end
@@ -153,7 +171,7 @@ function meshdata = importMeshDirect(objFilePath)
 % Import mesh from .obj file without saving to disk
 % Based on importobjtri.m and obj_fileTri2patch.m
 
-    [V, F, X, Y, Z, M] = readObjFile(objFilePath);
+    [~, ~, X, Y, Z, M] = readObjFile(objFilePath);
     [surfN, areas, bariC] = computeSurfaceNormals(X, Y, Z);
     
     Lref = max(max(X)) - min(min(X));
@@ -261,7 +279,177 @@ function [surfN, areas, bariC] = computeSurfaceNormals(x, y, z)
     areas = 0.5 .* ModN;
 end
 
-function param_eq = computeEnvironment(param_eq, h, lat, lon, dayOfYear, UTseconds, ...
+function time = normalizeTimeInputs(time)
+% Normalize year/day/seconds into valid calendar bounds
+
+    if ~isfield(time, 'year')
+        time.year = 2002;
+    end
+
+    totalSeconds = (time.dayOfYear - 1) * 86400 + time.UTseconds;
+    year = time.year;
+
+    while totalSeconds < 0
+        year = year - 1;
+        totalSeconds = totalSeconds + daysInYear(year) * 86400;
+    end
+
+    while totalSeconds >= daysInYear(year) * 86400
+        totalSeconds = totalSeconds - daysInYear(year) * 86400;
+        year = year + 1;
+    end
+
+    time.year = year;
+    time.dayOfYear = floor(totalSeconds / 86400) + 1;
+    time.UTseconds = totalSeconds - (time.dayOfYear - 1) * 86400;
+end
+
+function location = resolveLocation(location, time)
+% Resolve geodetic coordinates from direct input or ECI position
+
+    requiredGeodetic = {'altitude', 'latitude', 'longitude'};
+    if all(isfield(location, requiredGeodetic))
+        return;
+    end
+
+    if isfield(location, 'positionECI')
+        [location.longitude, location.latitude, location.altitude] = ...
+            eciToGeodetic(location.positionECI, time.year, time.dayOfYear, time.UTseconds);
+        return;
+    end
+
+    error('computeAeroForces:InvalidLocation', ...
+        'location must contain either altitude/latitude/longitude or positionECI.')
+end
+
+function [lonDeg, latDeg, alt] = eciToGeodetic(positionEci, year, dayOfYear, utSeconds)
+% Convert an ECI position into geodetic longitude, latitude, and altitude
+
+    positionEci = reshape(positionEci, 3, 1);
+    jdUt1 = julianDateFromYearAndDay(year, dayOfYear, utSeconds);
+    thetaGmst = greenwichSiderealTime(jdUt1);
+    positionEcef = eciToEcef(positionEci, thetaGmst);
+    [lonDeg, latDeg, alt] = geodeticFromEcef(positionEcef);
+end
+
+function positionEcef = eciToEcef(positionEci, thetaGmst)
+% Rotate an ECI position into the Earth-fixed frame
+
+    rotation = [cos(thetaGmst),  sin(thetaGmst), 0; ...
+               -sin(thetaGmst),  cos(thetaGmst), 0; ...
+                0,               0,              1];
+    positionEcef = rotation * positionEci;
+end
+
+function [lonDeg, latDeg, alt] = geodeticFromEcef(positionEcef)
+% Convert an Earth-fixed Cartesian position to geodetic coordinates
+
+    equatorialRadius = 6378137.0;
+    flattening = 1 / 298.257223563;
+    eccentricitySquared = flattening * (2 - flattening);
+
+    x = positionEcef(1);
+    y = positionEcef(2);
+    z = positionEcef(3);
+
+    rhoSquared = x^2 + y^2;
+    rho = sqrt(rhoSquared);
+
+    if norm(positionEcef) == 0
+        error('computeAeroForces:InvalidPosition', 'positionECI must be non-zero.')
+    end
+
+    dZ = eccentricitySquared * z;
+    tolerance = eps * equatorialRadius;
+    while true
+        zAdjusted = z + dZ;
+        distance = sqrt(rhoSquared + zAdjusted^2);
+        sinLatitude = zAdjusted / distance;
+        primeVertical = equatorialRadius / sqrt(1 - eccentricitySquared * sinLatitude^2);
+        dZNew = primeVertical * eccentricitySquared * sinLatitude;
+        if abs(dZNew - dZ) < tolerance
+            break;
+        end
+        dZ = dZNew;
+    end
+
+    lonDeg = atan2d(y, x);
+    latDeg = atan2d(zAdjusted, rho);
+    alt = distance - primeVertical;
+end
+
+function jd = julianDateFromYearAndDay(year, dayOfYear, utSeconds)
+% Convert year, day-of-year, and UTC seconds to Julian date
+
+    [month, day] = dayOfYearToMonthDay(year, dayOfYear);
+    hour = floor(utSeconds / 3600);
+    minute = floor((utSeconds - 3600 * hour) / 60);
+    second = utSeconds - 3600 * hour - 60 * minute;
+
+    if month <= 2
+        year = year - 1;
+        month = month + 12;
+    end
+
+    a = floor(year / 100);
+    b = 2 - a + floor(a / 4);
+    dayFraction = (hour + (minute + second / 60) / 60) / 24;
+    jd = floor(365.25 * (year + 4716)) + floor(30.6001 * (month + 1)) + ...
+        day + dayFraction + b - 1524.5;
+end
+
+function [month, day] = dayOfYearToMonthDay(year, dayOfYear)
+% Convert day-of-year to calendar month and day
+
+    monthLengths = [31, 28 + isLeapYear(year), 31, 30, 31, 30, ...
+                    31, 31, 30, 31, 30, 31];
+    remainingDays = dayOfYear;
+
+    month = 1;
+    while remainingDays > monthLengths(month)
+        remainingDays = remainingDays - monthLengths(month);
+        month = month + 1;
+    end
+
+    day = remainingDays;
+end
+
+function tf = isLeapYear(year)
+% Return true when a calendar year is a leap year
+
+    tf = mod(year, 4) == 0 && (mod(year, 100) ~= 0 || mod(year, 400) == 0);
+end
+
+function nDays = daysInYear(year)
+% Return the number of days in a calendar year
+
+    nDays = 365 + isLeapYear(year);
+end
+
+function theta = greenwichSiderealTime(julianDateUt1)
+% Compute Greenwich mean sidereal time using Vallado's IAU-82 formula
+
+    twoPi = 2 * pi;
+    tut1 = (julianDateUt1 - 2451545.0) / 36525.0;
+    theta = -6.2e-6 * tut1^3 + 0.093104 * tut1^2 + ...
+        (876600.0 * 3600.0 + 8640184.812866) * tut1 + 67310.54841;
+    theta = rem(theta * (pi / 180) / 240.0, twoPi);
+
+    if theta < 0
+        theta = theta + twoPi;
+    end
+end
+
+function gsiModel = normalizeGsiModel(gsiModel)
+% Normalize legacy GSI names to the supported internal set
+
+    gsiModel = lower(char(gsiModel));
+    if strcmp(gsiModel, 'dria')
+        gsiModel = 'sentman';
+    end
+end
+
+function param_eq = computeEnvironment(param_eq, h, lat, lon, year, dayOfYear, UTseconds, ...
     f107Average, f107Daily, magneticIndex, AnO)
 % Compute atmospheric parameters using NRLMSISE-00
 % Based on environment.m
@@ -276,7 +464,7 @@ function param_eq = computeEnvironment(param_eq, h, lat, lon, dayOfYear, UTsecon
     end
     
     % Atmospheric properties using MATLAB's atmosnrlmsise00
-    [T, param_eq.rho] = atmosnrlmsise00(h, lat, lon, 2002, dayOfYear, UTseconds, ...
+    [T, param_eq.rho] = atmosnrlmsise00(h, lat, lon, year, dayOfYear, UTseconds, ...
         (UTseconds/3600 + lon/15), f107Average, f107Daily, magneticIndex, Oflag);
     
     % Temperature data
@@ -349,7 +537,7 @@ function [aoa, aos] = quaternionToAeroAngles(q)
 % q = [q0, q1, q2, q3] where q0 is scalar part
 % Assumes quaternion represents rotation from body to wind frame
 
-    R_body2wind = quat2dcm(q);
+    R_body2wind = quat2dcm(reshape(q, 1, []));
     
     % Extract aoa and aos from DCM
     % Using standard aerospace convention
@@ -403,7 +591,7 @@ function results = calculateCoefficients(meshdata, aoa, aos, param_eq, flag_shad
     param_eq.ell = dot(-uL, surfN);
     
     % Local flat plate coefficients
-    [cp, ctau, cd, cl, param_eq] = computeMainCoeff(param_eq, delta, matID);
+    [cp, ctau, ~, ~, param_eq] = computeMainCoeff(param_eq, delta, matID);
     
     % Solar coefficients
     if flag_sol
@@ -413,9 +601,6 @@ function results = calculateCoefficients(meshdata, aoa, aos, param_eq, flag_shad
     % Backwards facing panels
     areaB = areas;
     areaB(delta * 180/pi > 90) = 0;
-    
-    shadow = zeros(size(areas));
-    shadow(areaB == 0) = 1;
     
     % Shadow analysis
     if flag_shad
@@ -431,7 +616,6 @@ function results = calculateCoefficients(meshdata, aoa, aos, param_eq, flag_shad
             cn(shadPan) = 0;
             cs(shadPan) = 0;
         end
-        shadow(shadPan) = 0.5;
     end
     
     % Areas
@@ -502,6 +686,9 @@ function [cp, ctau, cd, cl, param_eq] = computeMainCoeff(param_eq, delta, matID)
             param_eq.alpha = param_eq.alpha(matID);
         elseif nParam == 1
             param_eq.alpha = param_eq.alpha * ones(size(matID));
+        else
+            error('computeAeroForces:MaterialCountMismatch', ...
+                'Number of material properties does not match the mesh material count.')
         end
     end
     
@@ -509,9 +696,11 @@ function [cp, ctau, cd, cl, param_eq] = computeMainCoeff(param_eq, delta, matID)
     switch param_eq.gsi_model
         case 'cook'
             [cp, ctau, cd, cl] = coeffCook(param_eq, delta);
+        case 'sentman'
+            [cp, ctau, cd, cl] = coeffSentman(param_eq, delta);
         otherwise
-            % Default to Cook model
-            [cp, ctau, cd, cl] = coeffCook(param_eq, delta);
+            error('computeAeroForces:UnsupportedGsiModel', ...
+                'Supported gsi_model values are ''cook'' and ''sentman''.')
     end
 end
 
@@ -534,6 +723,27 @@ function [cp, ctau, cd, cl] = coeffCook(param_eq, delta)
     
     cp = cd .* cos(delta) + cl .* sin(delta);
     ctau = cd .* sin(delta) - cl .* cos(delta);
+end
+
+function [cp, ctau, cd, cl] = coeffSentman(param_eq, delta)
+% Sentman free-molecular-flow coefficients with Schamberg accommodation
+
+    Tinf = param_eq.Tinf;
+    alpha = param_eq.alpha;
+    s = param_eq.s;
+    Tw = param_eq.Tw;
+
+    cp = (cos(delta).^2 + 1 ./ (2 * s.^2)) .* (1 + erf(s .* cos(delta))) + ...
+        cos(delta) ./ (sqrt(pi) * s) .* exp(-s.^2 .* cos(delta).^2) + ...
+        0.5 .* sqrt(0.5 .* (1 + alpha .* (2 * Tw ./ (Tinf .* s.^2) - 1))) .* ...
+        (sqrt(pi) .* cos(delta) .* (1 + erf(s .* cos(delta))) + ...
+        (1 ./ s) .* exp(-s.^2 .* cos(delta).^2));
+
+    ctau = sin(delta) .* cos(delta) .* (1 + erf(s .* cos(delta))) + ...
+        sin(delta) ./ (s * sqrt(pi)) .* exp(-s.^2 .* cos(delta).^2);
+
+    cd = cp .* cos(delta) + ctau .* sin(delta);
+    cl = cp .* sin(delta) - ctau .* cos(delta);
 end
 
 function [cn, cs] = computeSolarCoeff(delta, param_eq)
@@ -626,7 +836,7 @@ function Ftest = checkInsideTri(p1, p2, p3, p0)
 % Check if points are inside triangles
 % Based on insidetri.m
 
-    Ftest = [];
+    insideTriangle = false(1, size(p1, 2));
     
     for i = 1:size(p1, 2)
         v0 = p3(:,i) - p1(:,i);
@@ -644,9 +854,11 @@ function Ftest = checkInsideTri(p1, p2, p3, p0)
         v = (dot00 * dot12 - dot01 * dot02) * invDenom;
         
         if (u >= 0) && (v >= 0) && (u + v <= 1)
-            Ftest = [Ftest, i];
+            insideTriangle(i) = true;
         end
     end
+
+    Ftest = find(insideTriangle);
 end
 
 %------------- END OF CODE --------------

@@ -51,6 +51,13 @@ function openLoadSimulation(mainFigHandle)
             if ~isfield(simParams.initParams.Environment, 'gasSurfaceInteractionModel')
                 simParams.initParams.Environment.gasSurfaceInteractionModel = 'cook';
             end
+            simParams.initParams.Environment.gasSurfaceInteractionModel = lower(char(simParams.initParams.Environment.gasSurfaceInteractionModel));
+            if ~any(strcmp(simParams.initParams.Environment.gasSurfaceInteractionModel, {'cook', 'sentman'}))
+                simParams.initParams.Environment.gasSurfaceInteractionModel = 'cook';
+            end
+            if ~isfield(simParams.initParams.Environment, 'year')
+                simParams.initParams.Environment.year = 2002;
+            end
         else
             disp('Error: The selected file does not contain simParams variable.');
             return; % Exit the function if simParams is not found in the file
