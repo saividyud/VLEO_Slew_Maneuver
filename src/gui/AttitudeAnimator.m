@@ -52,7 +52,7 @@ X_i = [r_i, v_i, beta_i, omega_i]';
 %% Simulating
 % Simualation bounds
 t0 = 0;
-t_span = 30*60; % 0.5 hour
+t_span = 5*60; % 0.5 hour
 dt = 1;
 
 ts = t0 : dt : t_span;
