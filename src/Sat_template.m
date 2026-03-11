@@ -151,7 +151,10 @@ function Xd = Sat_template(t,X)
 
     % Moment of inertia tensor
     % Can start with approximating a sphere (think Sputnik)
-    ICB = 2/5*83*(.58/2)^2*[1 0 0 ; 0 1 0 ;0 0 1]; % [kg m^2]
+    a = .1; %z axis length
+    b = .2; %y axis length
+    c = .3; % x axis length
+    ICB = 1/12*12*[(a^2+b^2) 0 0 ; 0 (b^2 + c^2) 0 ;0 0 (c^2 + a^2)]; % [kg m^2]
     
     % 2BP(states 1:6)
     Xd(1:3) = X(4:6);
