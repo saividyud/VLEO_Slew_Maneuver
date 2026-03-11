@@ -4,7 +4,12 @@
 
 **Team Size**: 3 contributors
 
-**Last Updated**: 2025-12-30
+**Team Members**:
+- Thanadis Charoenrujijin
+- Sai Vidyud Senthil Nathan
+- Connor Lashley
+
+**Last Updated**: 2026-03-11
 
 ---
 
@@ -26,21 +31,31 @@ The codebase **SHALL** maintain a modular structure enabling simultaneous indepe
 **Directory Structure**:
 ```
 VLEO_Slew_Maneuver/
-├── src/                    # Core reusable source code
-│   ├── controllers/        # Control laws and torque models
-│   ├── dynamics/           # Physics models and assets
-│   ├── gui/                # GUI and visualization code
-│   ├── propagators/        # Orbit propagation methods
-│   └── analysis/           # Analysis and post-processing functions
+├── src/
+│   └── +vleo/              # Core reusable namespaced MATLAB package code
+│       ├── +aero/          # Aerodynamic and surface interaction models
+│       ├── +analysis/      # Observation and orbit analysis helpers
+│       ├── +control/       # Control laws and controller resolution helpers
+│       ├── +dynamics/      # Spacecraft dynamics models
+│       ├── +gui/           # GUI workflows and parameter dialogs
+│       ├── +util/          # Shared utilities and path/config helpers
+│       └── +viz/           # Plotting and animation utilities
+├── scripts/                # Runnable top-level MATLAB scripts
 ├── lib/                    # External libraries (HPOP, SGP4, etc.) - DO NOT MODIFY
-├── tests/                  # Verification and unit tests
-├── examples/               # Examples for custom repo functions and demos
+├── tests/                  # Verification and regression tests
+│   ├── legacy/             # Archived or incomplete tests
+│   └── templates/          # Starter templates for new tests
+├── examples/               # Examples for reusable repo functions and demos
+│   └── legacy/             # Archived exploratory examples
+├── tools/                  # Non-MATLAB helper tooling
+├── simulations/            # Saved simulation outputs and generated artifacts
+├── assets/                 # Exported media and legacy result files
 ├── docs/                   # Documentation and theory
+├── data/                   # Shared geometry and generated data files
 ├── workspaces/             # Personal development sandboxes
 │   ├── Nill/
 │   ├── Sai/
 │   └── [Name]/
-└── data/                   # Shared data files (TLE, ephemeris, etc.)
 ```
 
 ### 1.2 Module Independence Criteria
@@ -53,17 +68,17 @@ A module is considered **properly decoupled** when:
 
 ### 1.3 Code Promotion Path
 ```
-workspaces/[Name]/  →  (review)  →  src/  →  (merge to main)
+workspaces/[Name]/  →  (review)  →  src/+vleo/  →  (merge to main)
      ↓
    Personal experimentation allowed
    No standards enforcement required
 ```
 
-**Rule**: Code in `src/` MUST meet all compliance requirements. Code in `workspaces/` is for experimentation and does not require compliance.
+**Rule**: Reusable code in `src/+vleo/` MUST meet all compliance requirements. Runnable entry-point scripts belong in `scripts/`. Code in `workspaces/` is for experimentation and does not require compliance.
 
 ### 1.4 Dependency Management
 - External libraries **SHALL** reside in `lib/` and remain unmodified
-- If a library function needs modification, create a wrapper in `src/` with clear documentation of changes
+- If a library function needs modification, create a wrapper in `src/+vleo/` with clear documentation of changes
 - All dependencies **SHALL** be documented in `setup_project.m`
 
 ---
@@ -71,14 +86,14 @@ workspaces/[Name]/  →  (review)  →  src/  →  (merge to main)
 ## 2. Compliance
 
 ### 2.1 Testing Requirements
-Every function in `src/` **MUST** have:
+Every reusable function in `src/+vleo/` **MUST** have:
 
 1. **Verification Test** (`tests/test_<function_name>.m`)
    - Tests against known analytical solutions or published data
    - Tests edge cases (zero inputs, singularities, limits)
    - Returns PASS/FAIL status
 
-Every **custom repo function** in `src/` **MUST** also have:
+Every **custom repo function** in `src/+vleo/` **MUST** also have:
 
 2. **Example Use Case** (`examples/example_<function_name>.m`)
    - Demonstrates typical usage
@@ -119,7 +134,7 @@ w = [wx; wy; wz];              % w in what frame?
 **Exception**: Loop indices (`i`, `j`, `k`) and temporary variables in limited scope.
 
 ### 2.4 Theory Documentation
-All physics, engineering, and mathematical theory used in `src/` functions **MUST** be documented in `docs/theory.tex`.
+All physics, engineering, and mathematical theory used in `src/+vleo/` functions **MUST** be documented in `docs/theory.tex`.
 
 Each theory entry **SHALL** include:
 - Name/title of the concept
@@ -137,7 +152,7 @@ $$a_{J2} = \frac{3}{2} J_2 \frac{\mu R_E^2}{r^4} \begin{bmatrix} ... \end{bmatri
 
 **Source**: Vallado, D. A. (2013). Fundamentals of Astrodynamics and Applications, 4th ed., p. 596
 
-**Implemented in**: Aerospace Toolbox `gravityzonal` as used in `src/Sat_template.m` and `src/sat_template_gui.m`
+**Implemented in**: Aerospace Toolbox `gravityzonal` as used in `src/+vleo/+dynamics/sat_dynamics_nonlinear.m` and `src/+vleo/+dynamics/sat_dynamics_gui.m`
 ```
 
 ### 2.5 No Magic Numbers
@@ -250,13 +265,24 @@ Format: `<quantity>_<of_what>_<in_frame>`
 
 **Examples**:
 ```matlab
-r_sat_ECI       % Position of satellite in ECI frame [m]
-v_sat_ECI       % Velocity of satellite in ECI frame [m/s]
+r_sat_eci       % Position of satellite in ECI frame [m]
+v_sat_eci       % Velocity of satellite in ECI frame [m/s]
 omega_body      % Angular velocity of body frame w.r.t. inertial, expressed in body [rad/s]
-q_ECI_to_body   % Quaternion rotating from ECI to body frame
-T_control_body  % Control torque expressed in body frame [N·m]
-r_sun_ECI       % Position of Sun in ECI frame [m]
+q_eci_to_body   % Quaternion rotating from ECI to body frame
+tau_control_body % Control torque expressed in body frame [N*m]
+r_sun_eci       % Position of Sun in ECI frame [m]
 ```
+
+#### Package Function Naming
+Reusable functions in `src/+vleo/` **SHALL** be called through the package namespace:
+
+```matlab
+vleo.dynamics.sat_dynamics_nonlinear
+vleo.aero.compute_aero_forces
+vleo.gui.open_simulation_gui
+```
+
+Runnable scenarios and entry points belong in `scripts/` and may call package functions internally.
 
 #### Transformation Notation
 Format: `<type>_<from>_to_<to>` or `<type>_<from>_<to>`
@@ -361,7 +387,7 @@ end
 
 ### 4.2 File Organization
 ```matlab
-% 1. Function signature
+% 1. Function signature (stored under src/+vleo/+<domain>/my_function.m)
 function output = my_function(input)
 
 % 2. Header documentation (as above)
@@ -430,6 +456,7 @@ Before merging to `main`:
 - [ ] Code follows naming conventions
 - [ ] Functions have proper headers
 - [ ] Theory documented (if applicable)
+- [ ] Reusable code is in `src/+vleo/` and entry-point scripts are in `scripts/`
 - [ ] At least one team member reviewed
 
 ---
@@ -445,6 +472,8 @@ Before requesting review:
 - [ ] Test file exists in `tests/`
 - [ ] Example file exists in `examples/` for each new custom repo function
 - [ ] Theory added to `docs/theory.tex` (if new physics)
+- [ ] Reusable logic is placed in `src/+vleo/`
+- [ ] Top-level runnable workflows are placed in `scripts/`
 - [ ] Code runs without errors
 - [ ] Edge cases handled
 
@@ -503,3 +532,4 @@ Typical ranges for VLEO ion thruster analysis:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2025-12-30 | Team | Initial draft |
+| 1.1 | 2026-03-11 | Team | Updated architecture, package layout, and repository conventions |

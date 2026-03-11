@@ -1,13 +1,22 @@
-function setup_project()
+function setup_project(verbose)
 % SETUP_PROJECT Adds the project tree to the MATLAB path.
 % It recursively adds folders from the repository root while skipping
 % hidden/editor folders and personal workspaces.
+
+    if nargin < 1 || isempty(verbose)
+        verbose = false;
+    elseif ~(isscalar(verbose) && (islogical(verbose) || isnumeric(verbose)))
+        error('VLEO_Slew_Maneuver:InvalidSetupVerbosity', ...
+            'setup_project verbosity flag must be a numeric or logical scalar.');
+    else
+        verbose = logical(verbose);
+    end
 
     persistent cached_root_dir cached_path_entries
 
     root_dir = fileparts(mfilename('fullpath'));
     setup_marker_name = 'VLEO_Slew_Maneuver_SetupRoot';
-    excluded_dirs = {'.git', '.claude', '.vscode', 'workspaces', 'assets', 'docs'};
+    excluded_dirs = {'assets', 'data', 'docs', 'legacy', 'simulations', 'templates', 'tools', 'workspaces'};
 
     if isempty(cached_path_entries) || ~strcmp(cached_root_dir, root_dir)
         cached_path_entries = get_project_paths(root_dir, excluded_dirs);
@@ -24,7 +33,10 @@ function setup_project()
         return;
     end
 
-    fprintf('Setting up project paths...\n');
+    if verbose
+        fprintf('Setting up project paths...\n');
+    end
+
     for i = 1:numel(cached_path_entries)
         candidate = cached_path_entries{i};
         if isempty(candidate) || is_path_entry_present(candidate)
@@ -32,10 +44,15 @@ function setup_project()
         end
 
         addpath(candidate);
-        fprintf('  Added: %s\n', candidate);
+        if verbose
+            fprintf('  Added: %s\n', candidate);
+        end
     end
 
-    fprintf('Project setup complete.\n');
+    if verbose
+        fprintf('Project setup complete.\n');
+    end
+
     setappdata(0, setup_marker_name, root_dir);
 end
 
@@ -86,5 +103,8 @@ function tf = should_skip_path(candidate, root_dir, excluded_dirs)
         relative_parts = strsplit(relative_path, filesep);
     end
 
-    tf = any(ismember(relative_parts, excluded_dirs));
+    tf = any(startsWith(relative_parts, '.')) || ...
+        any(startsWith(relative_parts, '+')) || ...
+        any(startsWith(relative_parts, '@')) || ...
+        any(ismember(relative_parts, excluded_dirs));
 end

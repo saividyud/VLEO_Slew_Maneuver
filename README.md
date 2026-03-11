@@ -6,19 +6,31 @@ Computationally determining the feasibility of using ion thrusters for slew mane
 
 ```text
 .
-├── src/                # Core source code (must meet compliance standards)
-│   ├── controllers/    # Control laws and torque models
-│   ├── dynamics/       # Physics models and assets
-│   └── gui/            # GUI and visualization code
+├── src/
+│   └── +vleo/          # Namespaced MATLAB package code
+│       ├── +aero/      # Aerodynamic and surface interaction models
+│       ├── +analysis/  # Observation and orbit analysis helpers
+│       ├── +control/   # Controller implementations and resolution helpers
+│       ├── +dynamics/  # Spacecraft dynamics models
+│       ├── +gui/       # GUI workflows and parameter dialogs
+│       ├── +util/      # Shared path, quaternion, and config utilities
+│       └── +viz/       # Animation and plotting utilities
+├── scripts/            # Runnable top-level MATLAB scripts
+├── examples/           # Reference examples and demos
+│   └── legacy/         # Older exploratory examples kept for reference
+├── tests/              # Verification scripts and regression tests
+│   ├── legacy/         # Incomplete or archived tests
+│   └── templates/      # Starter template for new MATLAB tests
+├── data/
+│   ├── geometry/       # Meshes and geometry assets used by models
+│   ├── generated/      # Generated intermediate data
+│   └── legacy/         # Legacy CSV/data files kept for compatibility
+├── tools/              # Non-MATLAB helper tooling (GIF rendering, build helpers)
+├── simulations/        # Saved simulation outputs and generated artifacts
+├── assets/             # Exported media and legacy result files
 ├── lib/                # External libraries (HPOP, SGP4, etc.) - DO NOT MODIFY
-├── tests/              # Unit tests and verification scripts
-├── examples/           # Examples for custom repo functions and demos
 ├── docs/               # Documentation and theory
-│   └── theory.tex      # Mathematical foundations and citations
-├── data/               # Shared data files (TLE, ephemeris)
 └── workspaces/         # Personal development sandboxes
-    ├── Nill/
-    └── Sai/
 ```
 
 ## Setup
@@ -26,9 +38,38 @@ Computationally determining the feasibility of using ion thrusters for slew mane
 1. Open MATLAB in the repository root
 2. Run the setup script:
    ```matlab
-   setup_project
+    setup_project
+    ```
+3. Call package functions with their namespace, for example:
+   ```matlab
+   vleo.gui.open_simulation_gui()
+   odefun = @vleo.dynamics.sat_dynamics_nonlinear;
    ```
-3. All paths are now configured
+
+`setup_project` is silent by default. Use `setup_project(true)` to print added paths for debugging.
+
+## Main Entry Points
+
+- Open the GUI:
+  ```matlab
+  run('scripts/open_simulation_gui.m')
+  ```
+- Run the volcano observation scenario:
+  ```matlab
+  run('scripts/control_test3.m')
+  ```
+- Run the aerodynamic regression test:
+  ```matlab
+  results = test_compute_aero_forces();
+  ```
+- Run the nonlinear dynamics smoke test:
+  ```matlab
+  test_sat_dynamics_nonlinear
+  ```
+- Render the latest `control_test3` animation data to GIF:
+  ```bash
+  python tools/render_gif.py
+  ```
 
 ## Project Standards
 
@@ -41,21 +82,24 @@ See [PROJECT_STANDARDS.md](PROJECT_STANDARDS.md) for complete guidelines.
 | ECI Frame | EME2000 (J2000) |
 | Units | SI (meters, seconds, radians) |
 | Quaternion | Scalar-first `[q0; q1; q2; q3]` |
-| Naming | `r_sat_ECI`, `v_sat_ECI`, `q_ECI_to_body` |
+| Package Naming | `vleo.<domain>.<function>` |
+| Variable Naming | `r_sat_eci`, `v_sat_eci`, `q_eci_to_body` |
 
 ### Compliance Checklist
 
-Before merging code to `src/`:
+Before merging reusable code into `src/+vleo/`:
 - [ ] Test file in `tests/`
 - [ ] Example file in `examples/` for each new custom repo function
 - [ ] Theory documented in `docs/theory.tex`
+- [ ] Runnable scripts placed in `scripts/` instead of `src/`
 - [ ] No magic numbers
 - [ ] SI units throughout
 
 ## Contributors
 
-- Nill
-- Sai Vidyud
+- Thanadis Charoenrujijin
+- Sai Vidyud Senthil Nathan
+- Connor Lashley
 
 ## License
 
