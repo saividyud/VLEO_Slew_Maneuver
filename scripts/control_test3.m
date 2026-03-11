@@ -419,6 +419,38 @@ end
 plotDesiredEulerDeg = vleo.util.unwrap_angle_history_deg(plotDesiredEulerDeg);
 plotActualEulerDeg = vleo.util.unwrap_angle_history_deg(plotActualEulerDeg);
 
+euler_csv_path = save_euler_history_csv(plotTime, plotDesiredEulerDeg, plotActualEulerDeg, params, scenarioSeedText);
+fprintf('Euler history CSV saved to: %s\n', euler_csv_path);
+
+animationIndices = 1:numel(tspan);
+if ~isnan(t_start_visible) && ~isnan(t_end_visible)
+    animationIndices = idx_start_visible(1):idx_end_visible(1);
+end
+
+animationTime = tspan(animationIndices);
+animationStateHistory = X_history(animationIndices, :);
+animationControlHistory = tau_control_history(animationIndices, :);
+animationAeroHistory = tau_aero_history(animationIndices, :);
+
+if ~isempty(tspan_verif)
+    animationTime = tspan_verif;
+    animationStateHistory = X_verif;
+end
+
+guiResults = struct();
+guiResults.t = animationTime(:);
+guiResults.rs = animationStateHistory(:, 1:3);
+guiResults.vs = animationStateHistory(:, 4:6);
+guiResults.betas = animationStateHistory(:, 7:10);
+guiResults.omegas = animationStateHistory(:, 11:13);
+guiResults.torques = animationControlHistory;
+guiResults.aeroTorques = animationAeroHistory;
+guiResults.totalTorques = animationControlHistory + animationAeroHistory;
+guiResults.eulerDeg = plotActualEulerDeg;
+
+fprintf('Generating GUI-compatible animated results plot...\n');
+vleo.viz.animate_results(struct('results', guiResults));
+
 % Attitude summary plot
 fprintf('Generating attitude summary plot...\n');
 
@@ -577,6 +609,24 @@ function csvPath = save_torque_history_csv(tspan, visibilityHistory, ...
         'tau_aero_x', 'tau_aero_y', 'tau_aero_z'});
 
     writetable(torqueTable, csvPath);
+end
+
+function csvPath = save_euler_history_csv(plotTime, desiredEulerDeg, actualEulerDeg, params, scenarioSeedText)
+    simulationsDir = vleo.util.simulations_dir();
+
+    timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+    csvName = sprintf('control_test3_euler_history_aero_%s_seed_%s_%s.csv', ...
+        on_off_text(params.includeAerodynamics), scenarioSeedText, timestamp);
+    csvPath = fullfile(simulationsDir, csvName);
+
+    eulerTable = table(plotTime(:), plotTime(:) / 60, ...
+        desiredEulerDeg(:, 1), desiredEulerDeg(:, 2), desiredEulerDeg(:, 3), ...
+        actualEulerDeg(:, 1), actualEulerDeg(:, 2), actualEulerDeg(:, 3), ...
+        'VariableNames', {'time_s', 'time_min', ...
+        'roll_desired_deg', 'pitch_desired_deg', 'yaw_desired_deg', ...
+        'roll_actual_deg', 'pitch_actual_deg', 'yaw_actual_deg'});
+
+    writetable(eulerTable, csvPath);
 end
 
 function eulerDeg = rotation_matrix_to_euler_deg(R_B2E)

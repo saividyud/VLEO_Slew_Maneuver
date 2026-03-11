@@ -102,7 +102,11 @@ function animate_results(source)
     timeAnn.VerticalAlignment = 'middle';
     timeAnn.BackgroundColor = 'white';
 
-    eulerDeg = vleo.util.quat_history_to_euler_deg(betas);
+    if isfield(results, 'eulerDeg')
+        eulerDeg = results.eulerDeg;
+    else
+        eulerDeg = vleo.util.quat_history_to_euler_deg(betas);
+    end
     ax3 = nexttile(layout, 2, [2, 1]);
     plot(ax3, ts / 60, eulerDeg(:, 1), 'r', 'LineWidth', 1);
     hold(ax3, 'on');
