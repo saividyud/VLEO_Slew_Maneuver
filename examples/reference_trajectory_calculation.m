@@ -7,8 +7,8 @@ clear;
 close all;
 
 t = 0:1:3600 * 0.25;
-longitudeDeg = 30;
-latitudeDeg = 45;
+longitudeDeg = 15;
+latitudeDeg = 0;
 refPoint0 = [6378e3 * cosd(longitudeDeg) * cosd(latitudeDeg), ...
     6378e3 * sind(longitudeDeg) * cosd(latitudeDeg), ...
     6378e3 * sind(latitudeDeg)];
@@ -23,8 +23,7 @@ for idx = 2:length(t)
 end
 
 earthRadius = 6378.14e3;
-[rEci, vEci] = vleo.analysis.keplerian_to_eci_safe(earthRadius + 250e3, 0, 45, 0, 0, 0, ...
-    'GravitationalParameter', 3.986004e14, 'Action', 'None');
+[rEci, vEci] = vleo.analysis.keplerian_to_eci_safe(earthRadius + 250e3, 0, 0, 0, 0, 0);
 X0 = [rEci(:); vEci(:); 0.5; -0.5; -0.5; 0.5; 0; 0; 0];
 
 [tOut, XOut] = ode45(@vleo.dynamics.sat_dynamics_nonlinear, t, X0);
@@ -41,10 +40,7 @@ title('Location of Satellite and Reference Location With Rotating Earth');
 axis equal;
 hold off;
 
-vPoint = XOut(:, 1:3) - refPoint(:, 1:3);
-for idx = 1:length(vPoint)
-    vPoint(idx, :) = vPoint(idx, :) / norm(vPoint(idx, :));
-end
+vPoint = refPoint(:,1:3)-XOut(:,1:3);
 
 figure(2);
 plot3(vPoint(:, 1), vPoint(:, 2), vPoint(:, 3), '*');
@@ -56,6 +52,7 @@ q = zeros(4, length(vPoint));
 ang = zeros(3, length(vPoint));
 for idx = 1:length(vPoint)
     v1 = vPoint(idx, 1:3);
+    v1 = v1/norm(v1);
     up = [0, 0, 1];
     v2 = cross(up, v1);
     v2 = v2 / norm(v2);
@@ -63,7 +60,10 @@ for idx = 1:length(vPoint)
     v3 = v3 / norm(v3);
     dcm = [v1', v2', v3'];
     q(:, idx) = dcm2quat(dcm)';
-    [ang(1, idx), ang(2, idx), ang(3, idx)] = quat2angle(q(:, idx)');
+    if idx > 131
+        q(:, idx) = -q(:,idx);
+    end
+    [ang(1,idx) , ang(2,idx), ang(3,idx) ] = quat2angle(q(:, idx)');
 end
 
 figure(3);
