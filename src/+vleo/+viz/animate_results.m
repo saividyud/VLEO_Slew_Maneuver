@@ -159,7 +159,7 @@ function animate_results(source)
     set_limits(ax5, [torques(:); aeroTorques(:)]);
     legend(ax5, {'\tau_{c,1}', '\tau_{c,2}', '\tau_{c,3}', '\tau_{a,1}', '\tau_{a,2}', '\tau_{a,3}'}, 'Location', 'best');
 
-    set(findall(fig, '-property', 'FontSize'), 'FontSize', 24);
+    set(findall(fig, '-property', 'FontSize'), 'FontSize', 14);
 
     for idx = 1:5:length(rs)
         if ~isvalid(fig)

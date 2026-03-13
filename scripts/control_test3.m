@@ -473,6 +473,7 @@ legend(axEuler, [l1, l2, l3, l4, l5, l6], ...
     'Yaw \psi desired', 'Yaw \psi actual'}, 'Location', 'best', 'FontSize', 14, 'AutoUpdate', 'off');
 mark_visibility_window(axEuler, t_start_visible, t_eruption, t_end_visible, 13);
 set_visible_domain(axEuler, t_start_visible, t_end_visible);
+exportgraphics(gcf, './assets/Euler angle tracking.png', 'Resolution', 300)
 
 % Torque breakdown plots
 fprintf('Generating torque breakdown plots...\n');
@@ -499,6 +500,7 @@ end
 xlabel(torqueLayout, 'Time (minutes)', 'FontSize', 16);
 title(torqueLayout, sprintf('Torque Breakdown with Aerodynamics %s', upper(on_off_text(params.includeAerodynamics))), ...
     'FontSize', 18);
+exportgraphics(gcf, './assets/Tracking torque breakdown.png', 'Resolution', 300)
 
 if ~isempty(ra_error)
     figure('Name', 'Verification Pointing Error', 'WindowStyle', 'normal', 'Position', [150 150 1200 600]);
@@ -513,6 +515,7 @@ if ~isempty(ra_error)
     grid on;
     xlim([tspan_verif(1) / 60, tspan_verif(end) / 60]);
 end
+exportgraphics(gcf, './assets/Pointing error breakdown.png', 'Resolution', 300)
 
 fprintf('\nSimulation complete!\n');
 
