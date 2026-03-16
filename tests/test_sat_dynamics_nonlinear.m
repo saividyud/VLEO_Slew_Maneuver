@@ -7,8 +7,9 @@ setup_project();
 
 fprintf('=== Testing sat_dynamics_nonlinear with aerodynamics ===\n\n');
 
-earthRadius = 6.37813649e6;
-mu = 3.986e14;
+c = vleo.util.constants();
+earthRadius = c.R_earth;
+mu = c.mu_earth;
 altitude = 200e3;
 r0 = earthRadius + altitude;
 v0 = sqrt(mu / r0);

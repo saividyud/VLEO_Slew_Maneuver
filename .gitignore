@@ -2,3 +2,6 @@
 ./Sai Testing
 .claude/
 .vscode/
+
+# Generated MATLAB artifacts do not belong in source packages.
+/src/**/*.mat

@@ -1,66 +1,47 @@
-function Xd = sat_dynamics_linearized(t, X, Xr, varargin)
-    %#ok<INUSD>
+function Xd = sat_dynamics_linearized(~, X, Xr, simParams)
+% SAT_DYNAMICS_LINEARIZED Small-angle attitude model about a fixed reference trim.
+
+    if nargin < 3 || numel(Xr) ~= 7
+        error('VLEO_Slew_Maneuver:InvalidLinearReference', ...
+            'Xr must be a 7x1 reference state [q_ref; omega_ref_body].');
+    end
+    if nargin < 4 || isempty(simParams)
+        simParams = struct();
+    end
+
+    c = vleo.util.constants();
+    mu = vleo.util.get_env_value(simParams, 'mu', c.mu_earth);
+    inertiaBody = vleo.dynamics.default_vehicle_config().inertiaBody;
+
+    qBodyFromEci = reshape(X(7:10), [], 1);
+    qNorm = norm(qBodyFromEci);
+    if qNorm < 1e-10 || ~isfinite(qNorm)
+        Xd = zeros(13, 1);
+        return;
+    end
+    X(7:10) = qBodyFromEci / qNorm;
+
     Xd = zeros(13, 1);
-
-    q0 = Xr(1);
-    q1 = Xr(2);
-    q2 = Xr(3);
-    q3 = Xr(4);
-    wx = Xr(5);
-    wy = Xr(6);
-    wz = Xr(7);
-
-    mu = 3.986e14;
-    r = norm(X(1:3));
-    inertiaBody = 2 / 5 * 83 * (0.58 / 2)^2 * [1, 0.001, 0.001; 0.001, 1, 0.001; 0.001, 0.001, 1];
-
     Xd(1:3) = X(4:6);
-    Xd(4:6) = -mu * X(1:3) / r^3;
 
-    j11 = (-inertiaBody(3, 1) * wy + inertiaBody(2, 1) * wz) / inertiaBody(1, 1) + ...
-        (-2 * inertiaBody(2, 1) * wx + inertiaBody(1, 1) * wy - inertiaBody(2, 2) * wy - inertiaBody(2, 3) * wz) / inertiaBody(1, 3) + ...
-        (2 * inertiaBody(3, 1) * wx + inertiaBody(3, 2) * wy - inertiaBody(1, 1) * wz + inertiaBody(3, 3) * wz) / inertiaBody(1, 2);
-    j12 = (inertiaBody(3, 2) * wx - inertiaBody(1, 2) * wz) / inertiaBody(1, 2) + ...
-        (inertiaBody(1, 1) * wx - inertiaBody(2, 2) * wx + 2 * inertiaBody(1, 2) * wy + inertiaBody(1, 3) * wz) / inertiaBody(1, 3) + ...
-        (-inertiaBody(3, 1) * wx - 2 * inertiaBody(3, 2) * wy + inertiaBody(2, 2) * wz - inertiaBody(3, 3) * wz) / inertiaBody(1, 1);
-    j13 = (-inertiaBody(2, 3) * wx + inertiaBody(1, 3) * wy) / inertiaBody(1, 3) + ...
-        (-inertiaBody(1, 1) * wx + inertiaBody(3, 3) * wx - inertiaBody(1, 2) * wy - 2 * inertiaBody(1, 3) * wz) / inertiaBody(1, 2) + ...
-        (inertiaBody(2, 1) * wx + inertiaBody(2, 2) * wy - inertiaBody(3, 3) * wy + 2 * inertiaBody(2, 3) * wz) / inertiaBody(1, 1);
-    j21 = (-inertiaBody(3, 1) * wy + inertiaBody(2, 1) * wz) / inertiaBody(2, 1) + ...
-        (-2 * inertiaBody(2, 1) * wx + inertiaBody(1, 1) * wy - inertiaBody(2, 2) * wy - inertiaBody(2, 3) * wz) / inertiaBody(2, 3) + ...
-        (2 * inertiaBody(3, 1) * wx + inertiaBody(3, 2) * wy - inertiaBody(1, 1) * wz + inertiaBody(3, 3) * wz) / inertiaBody(2, 2);
-    j22 = (inertiaBody(3, 2) * wx - inertiaBody(1, 2) * wz) / inertiaBody(2, 2) + ...
-        (inertiaBody(1, 1) * wx - inertiaBody(2, 2) * wx + 2 * inertiaBody(1, 2) * wy + inertiaBody(1, 3) * wz) / inertiaBody(2, 3) + ...
-        (-inertiaBody(3, 1) * wx - 2 * inertiaBody(3, 2) * wy + inertiaBody(2, 2) * wz - inertiaBody(3, 3) * wz) / inertiaBody(2, 1);
-    j23 = (-inertiaBody(2, 3) * wx + inertiaBody(1, 3) * wy) / inertiaBody(2, 3) + ...
-        (-inertiaBody(1, 1) * wx + inertiaBody(3, 3) * wx - inertiaBody(1, 2) * wy - 2 * inertiaBody(1, 3) * wz) / inertiaBody(2, 2) + ...
-        (inertiaBody(2, 1) * wx + inertiaBody(2, 2) * wy - inertiaBody(3, 3) * wy + 2 * inertiaBody(2, 3) * wz) / inertiaBody(2, 1);
-    j31 = (-inertiaBody(3, 1) * wy + inertiaBody(2, 1) * wz) / inertiaBody(3, 1) + ...
-        (-2 * inertiaBody(2, 1) * wx + inertiaBody(1, 1) * wy - inertiaBody(2, 2) * wy - inertiaBody(2, 3) * wz) / inertiaBody(3, 3) + ...
-        (2 * inertiaBody(3, 1) * wx + inertiaBody(3, 2) * wy - inertiaBody(1, 1) * wz + inertiaBody(3, 3) * wz) / inertiaBody(3, 2);
-    j32 = (inertiaBody(3, 2) * wx - inertiaBody(1, 2) * wz) / inertiaBody(3, 2) + ...
-        (inertiaBody(1, 1) * wx - inertiaBody(2, 2) * wx + 2 * inertiaBody(1, 2) * wy + inertiaBody(1, 2) * wz) / inertiaBody(3, 3) + ...
-        (-inertiaBody(3, 1) * wx - 2 * inertiaBody(3, 2) * wy + inertiaBody(2, 2) * wz - inertiaBody(3, 3) * wz) / inertiaBody(3, 1);
-    j33 = (-inertiaBody(2, 3) * wx + inertiaBody(1, 3) * wy) / inertiaBody(3, 3) + ...
-        (-inertiaBody(1, 1) * wx + inertiaBody(3, 3) * wx - inertiaBody(1, 2) * wy - 2 * inertiaBody(1, 3) * wz) / inertiaBody(3, 2) + ...
-        (inertiaBody(2, 1) * wx + inertiaBody(2, 2) * wy - inertiaBody(3, 3) * wy + 2 * inertiaBody(2, 3) * wz) / inertiaBody(3, 1);
+    rNorm = norm(X(1:3));
+    Xd(4:6) = -mu * X(1:3) / rNorm^3;
 
-    aMatrix = [0, -wx / 2, -wy / 2, wz / 2, -q1 / 2, -q2 / 2, q3 / 2; ...
-        wx / 2, 0, wz / 2, -wy / 2, q0 / 2, -q3 / 2, q2 / 2; ...
-        wy / 2, -wz / 2, 0, wx / 2, q3 / 2, q0 / 2, -q1 / 2; ...
-        wz / 2, wy / 2, -wx / 2, 0, -q2 / 2, q1 / 2, q0 / 2; ...
-        0, 0, 0, 0, j11, j12, j13; ...
-        0, 0, 0, 0, j21, j22, j23; ...
-        0, 0, 0, 0, j31, j32, j33];
+    omegaBody = X(11:13);
+    omegaRefBody = Xr(5:7);
+    Xd(7:10) = quaternion_kinematics(X(7:10), omegaBody);
 
-    kp = 0.0025 * eye(3);
-    kpOm = 0.1 * eye(3);
-    u = -kp * X(8:10);
-    u = u - kpOm * X(11:13);
-    kd = 0.1;
-    xd2 = aMatrix * X(7:13);
-    u = u - kd * xd2(5:7);
+    tauBody = vleo.dynamics.linearized_control_torque(X, Xr, simParams);
+    omegaErrorBody = omegaBody - omegaRefBody;
+    Xd(11:13) = inertiaBody \ (tauBody ...
+        - cross(omegaErrorBody, inertiaBody * omegaRefBody) ...
+        - cross(omegaRefBody, inertiaBody * omegaErrorBody));
+end
 
-    bMatrix = [zeros(4, 3); inv(inertiaBody)];
-    Xd(7:13) = aMatrix * X(7:13) + bMatrix * u;
+function qDot = quaternion_kinematics(qScalarFirst, omegaBody)
+    bMatrix = [qScalarFirst(1), -qScalarFirst(2), -qScalarFirst(3), -qScalarFirst(4); ...
+        qScalarFirst(2), qScalarFirst(1), -qScalarFirst(4), qScalarFirst(3); ...
+        qScalarFirst(3), qScalarFirst(4), qScalarFirst(1), -qScalarFirst(2); ...
+        qScalarFirst(4), -qScalarFirst(3), qScalarFirst(2), qScalarFirst(1)];
+    qDot = 0.5 * bMatrix * [0; omegaBody];
 end

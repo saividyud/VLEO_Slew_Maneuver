@@ -1,11 +1,12 @@
-function X0 = initial_state_from_sim_params(simParams)
+function [X0, Xr] = initial_state_from_sim_params(simParams)
     a = simParams.initParams.Orbit.semiMajorAxis;
     e = simParams.initParams.Orbit.eccentricity;
     inc = simParams.initParams.Orbit.inclination;
     raan = simParams.initParams.Orbit.RAAN;
     aop = simParams.initParams.Orbit.argPeriapse;
     ta = simParams.initParams.Orbit.trueAnomaly;
-    muOrbit = vleo.util.get_env_value(simParams, 'mu', 3.986004418e14);
+    c = vleo.util.constants();
+    muOrbit = vleo.util.get_env_value(simParams, 'mu', c.mu_earth);
 
     [rEci, vEci] = vleo.analysis.keplerian_to_eci_safe( ...
         a, e, inc, raan, aop, ta, ...
@@ -19,6 +20,10 @@ function X0 = initial_state_from_sim_params(simParams)
     b2 = cross(b3, b1);
     b2 = b2 / norm(b2);
     rBodyFromInertialRef = [b1'; b2'; b3'];
+    qRef = dcm2quat(rBodyFromInertialRef);
+    if qRef(1) < 0
+        qRef = -qRef;
+    end
 
     roll = deg2rad(simParams.initParams.Attitude.roll);
     pitch = deg2rad(simParams.initParams.Attitude.pitch);
@@ -46,4 +51,5 @@ function X0 = initial_state_from_sim_params(simParams)
         simParams.initParams.Attitude.yawRate]);
 
     X0 = [r0, v0, q0, omega0]';
+    Xr = [qRef, 0, 0, 0]';
 end
