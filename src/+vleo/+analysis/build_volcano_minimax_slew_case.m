@@ -1,4 +1,4 @@
-function solverCase = build_control_test4_solver_case(scenarioSeed)
+function solverCase = build_volcano_minimax_slew_case(scenarioSeed)
     if ~(isscalar(scenarioSeed) && isnumeric(scenarioSeed) && isfinite(scenarioSeed) && ...
             scenarioSeed >= 0 && scenarioSeed == floor(scenarioSeed))
         error('VLEO_Slew_Maneuver:InvalidScenarioSeed', ...
@@ -45,7 +45,7 @@ function solverCase = build_control_test4_solver_case(scenarioSeed)
     omegaTargetBody = trackingHistory.omega_track_body_history(idxMatch, :)';
 
     solverCase = struct();
-    solverCase.caseId = sprintf('control_test4_seed_%d', scenarioSeed);
+    solverCase.caseId = sprintf('volcano_minimax_slew_seed_%d', scenarioSeed);
     solverCase.scenarioSeed = double(scenarioSeed);
     solverCase.tStartVisibleSec = visibilityInfo.t_start_visible;
     solverCase.tEndVisibleSec = visibilityInfo.t_end_visible;

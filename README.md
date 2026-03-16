@@ -56,7 +56,7 @@ Computationally determining the feasibility of using ion thrusters for slew mane
   ```
 - Run the volcano observation scenario:
   ```matlab
-  run('scripts/control_test3.m')
+  run('scripts/volcano_tracking_demo.m')
   ```
 - Run the aerodynamic regression test:
   ```matlab

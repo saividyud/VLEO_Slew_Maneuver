@@ -17,22 +17,22 @@ if any(caseSeeds ~= floor(caseSeeds))
 end
 
 nCases = numel(caseSeeds);
-cases = repmat(vleo.analysis.build_control_test4_solver_case(caseSeeds(1)), nCases, 1);
+cases = repmat(vleo.analysis.build_volcano_minimax_slew_case(caseSeeds(1)), nCases, 1);
 
-fprintf('Exporting %d control_test4 solver cases...\n', nCases);
+fprintf('Exporting %d volcano minimax slew solver cases...\n', nCases);
 for caseIdx = 1:nCases
-    cases(caseIdx) = vleo.analysis.build_control_test4_solver_case(caseSeeds(caseIdx));
+    cases(caseIdx) = vleo.analysis.build_volcano_minimax_slew_case(caseSeeds(caseIdx));
     fprintf('  [%02d/%02d] %s  duration=%.2f s  angle=%.2f deg\n', ...
         caseIdx, nCases, cases(caseIdx).caseId, cases(caseIdx).maneuverDurationSec, ...
         cases(caseIdx).relativeAngleDeg);
 end
 
 generatedDir = vleo.util.generated_data_dir();
-matPath = fullfile(generatedDir, 'control_test4_solver_cases.mat');
-csvPath = fullfile(generatedDir, 'control_test4_solver_cases.csv');
+matPath = fullfile(generatedDir, 'volcano_minimax_slew_solver_cases.mat');
+csvPath = fullfile(generatedDir, 'volcano_minimax_slew_solver_cases.csv');
 
 metadata = struct();
-metadata.sourceScript = 'scripts/export_control_test4_cases.m';
+metadata.sourceScript = 'scripts/export_volcano_minimax_slew_cases.m';
 metadata.createdAt = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss'));
 metadata.caseSeeds = caseSeeds;
 metadata.caseCount = nCases;

@@ -12,7 +12,7 @@ This file records where the pre-refactor files moved during the `src/` cleanup.
 | `src/Sat_template_control.m` | `src/+vleo/+dynamics/sat_dynamics_controlled.m` | Controlled pointing dynamics |
 | `src/build_render_gif_binary.sh` | `tools/build_render_gif_binary.sh` | GIF build helper |
 | `src/computeAeroForces.m` | `src/+vleo/+aero/compute_aero_forces.m` | Renamed and packaged |
-| `src/control_test3.m` | `scripts/control_test3.m` | Runnable scenario script |
+| `src/control_test3.m` | `scripts/volcano_tracking_demo.m` | Runnable scenario script |
 | `src/controllers/control_torques.m` | `src/+vleo/+control/attitude_pd_controller.m` | Primary controller implementation |
 | `src/controllers/myController.m` | `src/+vleo/+control/zero_torque_controller.m` | Null/placeholder controller |
 | `src/keplerian_to_ijk_safe.m` | `src/+vleo/+analysis/keplerian_to_eci_safe.m` | Same job, clearer name |
