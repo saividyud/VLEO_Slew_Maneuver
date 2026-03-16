@@ -61,7 +61,8 @@ function fig = plot_results_summary(results, varargin)
     grid(ax3, 'on');
 
     ax4 = nexttile(tile);
-    earthRadius = 6378.14e3;
+    c = vleo.util.constants();
+    earthRadius = c.R_earth;
     [xe, ye, ze] = sphere(40);
     surf(ax4, xe * earthRadius, ye * earthRadius, ze * earthRadius, ...
         'FaceColor', [0.3, 0.5, 0.8], 'FaceAlpha', 0.3, 'EdgeColor', 'none');

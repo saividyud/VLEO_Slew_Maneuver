@@ -2,7 +2,8 @@ function animate_results(source)
     simParams = resolve_simulation_source(source);
     results = simParams.results;
 
-    earthRadius = 6378.14e3;
+    c = vleo.util.constants();
+    earthRadius = c.R_earth;
     rs = results.rs;
     vs = results.vs;
     betas = results.betas;

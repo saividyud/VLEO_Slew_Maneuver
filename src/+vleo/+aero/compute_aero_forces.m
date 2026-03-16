@@ -344,9 +344,9 @@ end
 function [lonDeg, latDeg, alt] = geodeticFromEcef(positionEcef)
 % Convert an Earth-fixed Cartesian position to geodetic coordinates
 
-    equatorialRadius = 6378137.0;
-    flattening = 1 / 298.257223563;
-    eccentricitySquared = flattening * (2 - flattening);
+    c = vleo.util.constants();
+    equatorialRadius = c.R_earth;
+    eccentricitySquared = c.eccentricity_squared_earth;
 
     x = positionEcef(1);
     y = positionEcef(2);
@@ -516,8 +516,9 @@ function data = getConstants()
 % Return physical constants
 % Based on ADBSatConstants.m
 
-    data.mu_E = 3.986004418e14;  % GM Earth [m^3/s^2]
-    data.R_E = 6.37813649e6;     % Equatorial Earth radius [m]
+    c = vleo.util.constants();
+    data.mu_E = c.mu_earth;      % GM Earth [m^3/s^2]
+    data.R_E = c.R_earth;        % Equatorial Earth radius [m]
     data.R = 8.31446261815324;   % Molar Gas constant [J K^-1 mol^-1]
     data.kb = 1.3806503e-23;     % Boltzmann constant [m^2 kg^-2 K^-1]
     data.NA = 6.02214076e23;     % Avogadro constant [n mol^-1]
@@ -608,8 +609,6 @@ function results = calculateCoefficients(meshdata, aoa, aos, param_eq, flag_shad
         
         cp(shadPan) = 0;
         ctau(shadPan) = 0;
-        cd(shadPan) = 0;
-        cl(shadPan) = 0;
         areaB(shadPan) = 0;
         
         if flag_sol

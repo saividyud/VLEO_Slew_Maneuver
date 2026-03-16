@@ -7,22 +7,24 @@ clear;
 close all;
 
 t = 0:1:3600 * 0.25;
+c = vleo.util.constants();
 longitudeDeg = 15;
 latitudeDeg = 0;
-refPoint0 = [6378e3 * cosd(longitudeDeg) * cosd(latitudeDeg), ...
-    6378e3 * sind(longitudeDeg) * cosd(latitudeDeg), ...
-    6378e3 * sind(latitudeDeg)];
+refPoint0 = [c.R_earth * cosd(longitudeDeg) * cosd(latitudeDeg), ...
+    c.R_earth * sind(longitudeDeg) * cosd(latitudeDeg), ...
+    c.R_earth * sind(latitudeDeg)];
 
-earthRate = 7.29e-5;
-refPoint = refPoint0;
-for idx = 2:length(t)
+earthRate = c.omega_earth;
+refPoint = zeros(numel(t), 3);
+refPoint(1, :) = refPoint0;
+for idx = 2:numel(t)
     rEcefToEci = [cos(earthRate * t(idx)), -sin(earthRate * t(idx)), 0; ...
         sin(earthRate * t(idx)), cos(earthRate * t(idx)), 0; ...
         0, 0, 1];
-    refPoint(end + 1, :) = (rEcefToEci * refPoint0')'; %#ok<AGROW>
+    refPoint(idx, :) = (rEcefToEci * refPoint0')';
 end
 
-earthRadius = 6378.14e3;
+earthRadius = c.R_earth;
 [rEci, vEci] = vleo.analysis.keplerian_to_eci_safe(earthRadius + 250e3, 0, 0, 0, 0, 0);
 X0 = [rEci(:); vEci(:); 0.5; -0.5; -0.5; 0.5; 0; 0; 0];
 

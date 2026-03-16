@@ -1,6 +1,7 @@
 function set_orbital_parameters(subFigHandle)
     salmonColor = [1, 0.4941, 0.4392];
-    earthRadius = 6378.14e3;
+    c = vleo.util.constants();
+    earthRadius = c.R_earth;
     simParams = guidata(subFigHandle);
 
     subFig = uifigure('Name', 'Set Orbital Parameters', 'Position', [500, 300, 800, 450]);

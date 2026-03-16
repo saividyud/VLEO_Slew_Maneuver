@@ -3,7 +3,12 @@ function run_simulation(subFigHandle)
     simParams = vleo.gui.ensure_simulation_defaults(simParams);
     guidata(subFigHandle, simParams);
 
-    X0 = vleo.dynamics.initial_state_from_sim_params(simParams);
+    if strcmpi(simParams.initParams.Simulation.type, 'Nonlinear')
+        X0 = vleo.dynamics.initial_state_from_sim_params(simParams);
+        Xr = [];
+    else
+        [X0, Xr] = vleo.dynamics.initial_state_from_sim_params(simParams);
+    end
     t0 = simParams.initParams.Simulation.initialTime;
     tf = simParams.initParams.Simulation.finalTime;
     dt = simParams.initParams.Simulation.timeStep;
@@ -15,8 +20,7 @@ function run_simulation(subFigHandle)
     if isNonlinear
         odeFun = @(t, X) vleo.dynamics.sat_dynamics_gui(t, X, subFigHandle);
     else
-        Xr = [1; 0; 0; 0; 0; 0; 0];
-        odeFun = @(t, X) vleo.dynamics.sat_dynamics_linearized(t, X, Xr);
+        odeFun = @(t, X) vleo.dynamics.sat_dynamics_linearized(t, X, Xr, simParams);
     end
 
     progressDialog = uiprogressdlg(subFigHandle, ...
@@ -42,7 +46,11 @@ function run_simulation(subFigHandle)
         aeroConfig = vleo.dynamics.build_aero_config_from_sim_params(simParams);
 
         for k = 1:nSteps
-            tauControl = vleo.dynamics.evaluate_controller_torque(simParams, tOut(k), XOut(k, :)');
+            if isNonlinear
+                tauControl = vleo.dynamics.evaluate_controller_torque(simParams, tOut(k), XOut(k, :)');
+            else
+                tauControl = vleo.dynamics.linearized_control_torque(XOut(k, :)', Xr, simParams);
+            end
             if isNonlinear && vleo.util.get_mode_flag(simParams, 'enableAero', true)
                 [~, tauAero] = vleo.dynamics.compute_aero_effects(tOut(k), XOut(k, :)', aeroConfig);
             else

@@ -51,7 +51,7 @@ function set_controller_parameters(subFigHandle)
         if isequal(fileName, 0)
             return;
         end
-        entryFunc.Value = vleo.control.normalize_controller_name(fullfile(pathName, fileName));
+        [~, entryFunc.Value] = vleo.control.resolve_controller_handle(fullfile(pathName, fileName));
     end
 
     function save_and_close()
