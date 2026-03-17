@@ -1,53 +1,17 @@
-<<<<<<< Updated upstream
-projectRoot = fileparts(fileparts(mfilename('fullpath')));
-addpath(projectRoot);
-setup_project();
-=======
 clear
 clc
 close all
->>>>>>> Stashed changes
 
-clc;
-clear;
-close all;
+%% Initializing video writer
+save = false;
 
-c = vleo.util.constants();
-[t, X] = simulate_attitude_history(c);
-
-torques = zeros(numel(t), 3);
-for idx = 1:numel(t)
-    torques(idx, :) = vleo.control.attitude_pd_controller(t(idx), X(idx, :)')';
+if save
+    v = VideoWriter(fullfile(fileparts(mfilename('fullpath')), '/../assets/Final Report Rough Draft.mp4'), 'MPEG-4');
+    v.FrameRate = 30; % Set frame rate to 60 frames per second
+    v.Quality = 75;   % Set video quality (0-100)
+    open(v);
 end
 
-<<<<<<< Updated upstream
-results = struct( ...
-    't', t, ...
-    'rs', X(:, 1:3), ...
-    'vs', X(:, 4:6), ...
-    'betas', X(:, 7:10), ...
-    'omegas', X(:, 11:13), ...
-    'torques', torques);
-vleo.viz.animate_results(struct('results', results));
-
-function [t, X] = simulate_attitude_history(c)
-    duration = 30 * 60;
-    timeStep = 1;
-    ts = 0:timeStep:duration;
-
-    [rEci, vEci] = vleo.analysis.keplerian_to_eci_safe( ...
-        c.R_earth + 250e3, 0, 0, 0, 0, 0, ...
-        'GravitationalParameter', c.mu_earth, 'Action', 'None');
-
-    b1 = rvec(vEci / norm(vEci));
-    b3 = rvec(-rEci / norm(rEci));
-    b2 = cross(b3, b1);
-    b2 = b2 / norm(b2);
-    rBodyFromInertial = [b1'; b2'; b3'];
-    q0 = dcm2quat(rBodyFromInertial);
-    if q0(1) < 0
-        q0 = -q0;
-=======
 %% Initial state (in Keplerian orbital elements)
 a = 250e3 + earthRadius; % 250 km above Earth semimajor axis
 e = 0; % Eccentricity
@@ -83,7 +47,7 @@ beta_i = QfromDCM(R_BI_i)'; % Initial quaternion
 omega_i = [0, 0, 0]; % Initial angular rate
 
 X_i = [r_i, v_i, beta_i, omega_i]';
-
+Xr = [0, 0, 6678e3, -7789, 0, 0, 1, 0 , 0, 0, 0, 0, 0]';
 %% Simulating
 % Simualation bounds
 t0 = 0;
@@ -93,7 +57,7 @@ dt = 1;
 ts = t0 : dt : t_span;
 
 opts = odeset('RelTol', 1e-6,'AbsTol', 1e-6);
-[t, X] = ode45(@vleo.dynamics.sat_dynamics_nonlinear, ts, X_i, opts);
+[t, X] = ode45(@(t,X)vleo.dynamics.sat_dynamics_linearized(t,X,Xr) , ts, X_i, opts);
 
 % Extract position and velocity from the state vector
 rs = X(:, 1:3);
@@ -514,14 +478,139 @@ function arrows = draw_frame(vectors, color, parent)
     arrows = cell(1, 3);
     for i = 1:3
         arrows{i} = quiver3(0, 0, 0, vectors(1, i), vectors(2, i), vectors(3, i), color, 'LineWidth', 2, Parent=parent);
->>>>>>> Stashed changes
     end
 
-    X0 = [rvec(rEci); rvec(vEci); q0(:); 0; 0; 0];
-    opts = odeset('RelTol', 1e-12, 'AbsTol', 1e-12);
-    [t, X] = ode45(@vleo.dynamics.sat_dynamics_nonlinear, ts, X0, opts);
 end
 
-function v = rvec(v)
-    v = reshape(v, [], 1);
+function RV = RVfromOE(orbit, mu)
+    arguments
+        orbit
+        mu double = 3.986004e14
+    end
+    
+    %this function calculates the classical two-body orbital parameters 
+    %using R and V vectors at one instant as input
+    % global mu_sun; global mu_earth; global mu;
+    % mu_sun = 132712440000.00002;
+    % mu_earth = 3.986004e14;
+    % erad = 6378.14e3;
+    % dtr = pi/180;
+    % mu = mu_earth;
+    
+    a = orbit(1);
+    e = orbit(2);
+    i = orbit(3);
+    Om = orbit(4);
+    om = orbit(5);
+    phi = orbit(6);
+    
+    cphi = cos(phi);
+    sphi = sin(phi);
+    
+    R313 = FRE(3, om)*FRE(1, i)*FRE(3, Om);  %this is ROI
+    R313T = R313';      %this is RIO
+    
+    E = -mu/2/a;
+    p = a*(1 - e^2);
+    h = sqrt(mu*p);
+    r = p/(1 + e*cphi);
+    v = sqrt(2*(E + mu/r));
+    phid = h/r^2;
+    rd = p*e*sphi*sqrt(mu/p^3);
+    
+    
+    phat = R313T(:,1);
+    qhat = R313T(:,2);
+    hhat = R313T(:,3);
+    
+    rbar = r*(phat*cphi + qhat*sphi);
+    vbar = (rd*cphi - r*phid*sphi)*phat + (rd*sphi + r*phid*cphi)*qhat;
+    
+    RV = [rbar vbar];
+end
+
+function beta = QfromDCM(R_BI)
+    % QfromDCM calculates the quaternion given a DCM from inertial to body 
+    % frame.
+    %
+    % Parameters
+    % ----------
+    % R_BI : 3x3 matrix
+    %   Rotation DCM for converting from inertial frame to body frame
+    %
+    % Returns
+    % -------
+    % beta : 4x1 quaternion
+    %   Output quaternion
+    
+    tr = trace(R_BI);
+    
+    
+    %%%first compute squares of each quaternion
+    bb(1) = 0.25*(1 + tr);
+    bb(2) = 0.25*(1 + 2*R_BI(1,1) - tr);
+    bb(3) = 0.25*(1 + 2*R_BI(2,2) - tr);
+    bb(4) = 0.25*(1 + 2*R_BI(3,3) - tr);
+    
+    %%%find the max!
+    [~, mxpos] = max(bb);
+    
+    %%%identify the quaternion with max sq-value
+    beta(mxpos) = sqrt(bb(mxpos));
+    
+    stan(1) = (R_BI(2,3) - R_BI(3,2))/4;
+    stan(2) = (R_BI(3,1) - R_BI(1,3))/4;
+    stan(3) = (R_BI(1,2) - R_BI(2,1))/4;
+    stan(4) = (R_BI(1,2) + R_BI(2,1))/4;
+    stan(5) = (R_BI(1,3) + R_BI(3,1))/4;
+    stan(6) = (R_BI(2,3) + R_BI(3,2))/4;
+    
+    if mxpos == 1
+        sindex = [1;2;3];
+        betaindex = [2;3;4];
+    elseif mxpos == 2
+        sindex = [1;4;5];
+        betaindex = [1;3;4];
+    elseif mxpos == 3
+        sindex = [2;4;6];
+        betaindex = [1;2;4];
+    else
+        sindex = [3;5;6];
+        betaindex = [1;2;3];
+    end
+    
+    beta(betaindex) = stan(sindex)/beta(mxpos);
+    if beta(1) < 0
+        beta = -beta;
+    end
+    beta = beta';
+end
+
+function R_BI = DCMfromQ(beta)
+    % DCMfromQ calculates the DCM from inertial to body frame given a 
+    % quaternion.
+    %
+    % Parameters
+    % ----------
+    % beta : 4x1 quaternion
+    %   Input quaternion
+    %
+    % Returns
+    % -------
+    % R_BI : 3x3 matrix
+    %   Rotation DCM for converting from inertial frame to body frame
+        
+        % Extracting quaternions
+        b0 = beta(1);
+        b1 = beta(2);
+        b2 = beta(3);
+        b3 = beta(4);
+    
+        % Calculating DCM
+        R_BI = [
+            b0^2 + b1^2 - b2^2 - b3^2, 2*(b1*b2 + b0*b3), 2*(b1*b3 - b0*b2);
+            2*(b1*b2 - b0*b3), b0^2 - b1^2 + b2^2 - b3^2, 2*(b2*b3 + b0*b1);
+            2*(b1*b3 + b0*b2), 2*(b2*b3 - b0*b1), b0^2 - b1^2 - b2^2 + b3^2
+        ];
+    
 end
