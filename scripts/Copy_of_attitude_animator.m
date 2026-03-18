@@ -52,8 +52,13 @@ beta_i = QfromDCM(R_BI_i)'; % Initial quaternion
 % Zero initial angular spin
 omega_i = [0, 0, 0]; % Initial angular rate
 
+<<<<<<< Updated upstream
 X_i = [r_i, v_i, beta_i, omega_i]';
 Xr = [1; 0; 0; 0; 0; 0; 0];% Reference: identity quaternion, zero angular rate
+=======
+X_i = [r_i, v_i, beta_i, omega_i, zeros(1,4)]';
+Xr = [ 1, 0 , 0, 0, 0, 0, 0]';
+>>>>>>> Stashed changes
 %% Simulating
 % Simualation bounds
 t0 = 0;
@@ -63,7 +68,7 @@ dt = 1;
 ts = t0 : dt : t_span;
 
 opts = odeset('RelTol', 1e-6,'AbsTol', 1e-6);
-[t, X] = ode45(@(t,X)vleo.dynamics.sat_dynamics_linearized(t,X,Xr) , ts, X_i, opts);
+[t, X] = ode45(@(t,X) vleo.dynamics.sat_dynamics_linearized_augmented(t,X,Xr) , ts, X_i, opts);
 
 % Extract position and velocity from the state vector
 rs = X(:, 1:3);

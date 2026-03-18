@@ -3,13 +3,13 @@ function Xd = sat_dynamics_linearized_augmented(t, X, Xr, varargin)
     Xd = zeros(17, 1);
 
     %reference for linearization
-    q0 = Xr(7);
-    q1 = Xr(8);
-    q2 = Xr(9);
-    q3 = Xr(10);
-    wx = Xr(11);
-    wy = Xr(12);
-    wz = Xr(13);
+    q0 = Xr(1);
+    q1 = Xr(2);
+    q2 = Xr(3);
+    q3 = Xr(4);
+    wx = Xr(5);
+    wy = Xr(6);
+    wz = Xr(7);
 
     %constants
     mu = 3.986e14;
@@ -69,13 +69,16 @@ function Xd = sat_dynamics_linearized_augmented(t, X, Xr, varargin)
     bMatrix = [zeros(4, 3); inv(inertiaBody); zeros(4,3)];
 
     %Matrix mutiplied by reference 
-    refMatrix = [ zeros(8,4) ; eye(4)];
+    refMatrix = [ zeros(7,4) ; eye(4)];
+
+    %
+    ref = vleo.dynamics.Ref(t,X);
 
     %controller
-    Ki = -.1;
-    Kp = -.1;
-    Kq = -.1;
-    u = Ki * X(15:17) + Kq *(ref - X(8:10))  + Kp * X(11:13);
+    Ki = 0;
+    Kp = 0.01;
+    Kq = 0.01;
+    u = Ki * X(15:17) + Kq *(ref(2:4) - X(8:10))  + Kp * X(11:13);
 
-    Xd(7:17) = aMatrix * X(7:17) + bMatrix * u + rMatrix * ref ;
+    Xd(7:17) = aMatrix * X(7:17) + bMatrix * u + refMatrix * ref ;
 end
