@@ -1,4 +1,4 @@
-function Xd = sat_dynamics_linearized_augmented(t, X, Xr, varargin)
+function Xd = Sat_template_linearized_augmented(t, X, Xr)
     %#ok<INUSD>
     Xd = zeros(17, 1);
 
@@ -71,14 +71,15 @@ function Xd = sat_dynamics_linearized_augmented(t, X, Xr, varargin)
     %Matrix mutiplied by reference 
     refMatrix = [ zeros(7,4) ; eye(4)];
 
-    %
+    %calculating reference attitude
     ref = vleo.dynamics.Ref(t,X);
 
     %controller
-    Ki = 0;
-    Kp = 0.01;
-    Kq = 0.01;
-    u = Ki * X(15:17) + Kq *(ref(2:4) - X(8:10))  + Kp * X(11:13);
+    Ki = 0.0005;
+    Kp = -0.3;
+    Kq = -.005;
+    u = Ki * X(15:17) + Kq *(X(8:10) - ref(2:4) + Xr(2:4))  + Kp * X(11:13);
 
-    Xd(7:17) = aMatrix * X(7:17) + bMatrix * u + refMatrix * ref ;
+    Xd(7:17) = aMatrix * X(7:17) + bMatrix * u + refMatrix * (ref -Xr(1:4));
+    
 end
