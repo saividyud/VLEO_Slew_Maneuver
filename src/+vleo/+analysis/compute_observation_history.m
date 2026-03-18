@@ -1,10 +1,10 @@
-function history = compute_observation_history(tspan, xHistory, rVolcano0, params)
+function history = compute_observation_history(tspan, xHistory, rTOO0, params)
     nSteps = size(xHistory, 1);
     history = struct();
     history.ra_camera_history = zeros(nSteps, 1);
     history.dec_camera_history = zeros(nSteps, 1);
-    history.ra_volcano_history = zeros(nSteps, 1);
-    history.dec_volcano_history = zeros(nSteps, 1);
+    history.ra_TOO_history = zeros(nSteps, 1);
+    history.dec_TOO_history = zeros(nSteps, 1);
     history.visibility_history = false(nSteps, 1);
     history.zenith_distance_history = zeros(nSteps, 1);
     history.pointing_eci_history = zeros(nSteps, 3);
@@ -20,27 +20,27 @@ function history = compute_observation_history(tspan, xHistory, rVolcano0, param
 
         rSat = xHistory(i, 1:3)';
         vSat = xHistory(i, 4:6)';
-        [rVolcano, vVolcano] = vleo.dynamics.volcano_state_at_time(tspan(i), rVolcano0, params.omega_earth);
-        apparentVolcanoVec = rVolcano - rSat;
-        apparentVolcanoVec = apparentVolcanoVec / norm(apparentVolcanoVec);
+        [rTOO, vTOO] = vleo.dynamics.too_state_at_time(tspan(i), rTOO0, params.omega_earth);
+        apparentTOOVec = rTOO - rSat;
+        apparentTOOVec = apparentTOOVec / norm(apparentTOOVec);
 
-        decRad = asin(apparentVolcanoVec(3));
-        raRad = atan2(apparentVolcanoVec(2), apparentVolcanoVec(1));
+        decRad = asin(apparentTOOVec(3));
+        raRad = atan2(apparentTOOVec(2), apparentTOOVec(1));
         if raRad < 0
             raRad = raRad + 2 * pi;
         end
-        history.ra_volcano_history(i) = rad2deg(raRad);
-        history.dec_volcano_history(i) = rad2deg(decRad);
+        history.ra_TOO_history(i) = rad2deg(raRad);
+        history.dec_TOO_history(i) = rad2deg(decRad);
 
-        history.visibility_history(i) = dot(rVolcano, rSat - rVolcano) > 0;
+        history.visibility_history(i) = dot(rTOO, rSat - rTOO) > 0;
 
-        zenithAtVolcano = rVolcano / norm(rVolcano);
-        volcanoToSat = rSat - rVolcano;
-        volcanoToSatUnit = volcanoToSat / norm(volcanoToSat);
-        cosZenith = dot(zenithAtVolcano, volcanoToSatUnit);
+        zenithAtTOO = rTOO / norm(rTOO);
+        tooToSat = rSat - rTOO;
+        tooToSatUnit = tooToSat / norm(tooToSat);
+        cosZenith = dot(zenithAtTOO, tooToSatUnit);
         history.zenith_distance_history(i) = rad2deg(acos(vleo.util.clamp_scalar(cosZenith, -1, 1)));
 
-        history.R_B2E_hist(:, :, i) = vleo.dynamics.build_tracking_frame(rSat, vSat, rVolcano, vVolcano);
+        history.R_B2E_hist(:, :, i) = vleo.dynamics.build_tracking_frame(rSat, vSat, rTOO, vTOO);
         history.q_track_history(i, :) = dcm2quat(history.R_B2E_hist(:, :, i)')';
         history.euler_track_history_deg(i, :) = vleo.util.rotation_matrix_to_euler_deg(history.R_B2E_hist(:, :, i));
     end

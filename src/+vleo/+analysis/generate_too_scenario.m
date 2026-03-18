@@ -1,4 +1,4 @@
-function scenario = generate_volcano_scenario(params)
+function scenario = generate_too_scenario(params)
     altitude = 200e3;
     rOrbit = params.R_e + altitude;
     vCirc = sqrt(params.mu / rOrbit);
@@ -41,20 +41,20 @@ function scenario = generate_volcano_scenario(params)
         axis1 * dot(axis1, rProjected) * (1 - cos(theta));
 
     axis2 = rProjected / norm(rProjected);
-    rVolcano0 = rTemp * cos(phi) + ...
+    rTOO0 = rTemp * cos(phi) + ...
         cross(axis2, rTemp) * sin(phi) + ...
         axis2 * dot(axis2, rTemp) * (1 - cos(phi));
-    rVolcano0 = rVolcano0 / norm(rVolcano0) * params.R_e;
+    rTOO0 = rTOO0 / norm(rTOO0) * params.R_e;
 
-    volcanoDirection = rVolcano0 / norm(rVolcano0);
-    volcanoLat = rad2deg(asin(volcanoDirection(3)));
-    volcanoLon = rad2deg(atan2(volcanoDirection(2), volcanoDirection(1)));
-    visibilityAtEruption = dot(rVolcano0, x0(1:3) - rVolcano0);
+    tooDirection = rTOO0 / norm(rTOO0);
+    tooLat = rad2deg(asin(tooDirection(3)));
+    tooLon = rad2deg(atan2(tooDirection(2), tooDirection(1)));
+    visibilityAtEruption = dot(rTOO0, x0(1:3) - rTOO0);
 
-    zenithAtVolcano0 = rVolcano0 / norm(rVolcano0);
-    volcanoToSat0 = x0(1:3) - rVolcano0;
-    volcanoToSat0Unit = volcanoToSat0 / norm(volcanoToSat0);
-    cosZenith0 = dot(zenithAtVolcano0, volcanoToSat0Unit);
+    zenithAtTOO = rTOO0 / norm(rTOO0);
+    tooToSat0 = x0(1:3) - rTOO0;
+    tooToSat0Unit = tooToSat0 / norm(tooToSat0);
+    cosZenith0 = dot(zenithAtTOO, tooToSat0Unit);
     zenithDistance0 = rad2deg(acos(vleo.util.clamp_scalar(cosZenith0, -1, 1)));
 
     scenario = struct();
@@ -66,9 +66,9 @@ function scenario = generate_volcano_scenario(params)
     scenario.z_body_eci = zBodyEci;
     scenario.X0 = x0;
     scenario.orbital_period = orbitalPeriod;
-    scenario.r_volcano_0 = rVolcano0;
-    scenario.volcano_lat = volcanoLat;
-    scenario.volcano_lon = volcanoLon;
+    scenario.r_too_0 = rTOO0;
+    scenario.too_lat = tooLat;
+    scenario.too_lon = tooLon;
     scenario.theta_max = thetaMax;
     scenario.theta = theta;
     scenario.phi = phi;

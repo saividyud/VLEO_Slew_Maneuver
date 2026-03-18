@@ -13,7 +13,15 @@ function result = solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, q
     parser = inputParser;
     addParameter(parser, 'refineNonlinear', false, @islogical);
     addParameter(parser, 'nRefinementIntervals', max(8, min(16, nIntervals)), @is_valid_interval_vector);
+    addParameter(parser, 'momentArms', [], @(x) isempty(x) || (isnumeric(x) && numel(x)==3 && all(isfinite(x)) && all(x>0)));
     parse(parser, varargin{:});
+
+    momentArms = parser.Results.momentArms;
+    if isempty(momentArms)
+        momentArms = ones(3, 1);
+    else
+        momentArms = reshape(momentArms, 3, 1);
+    end
 
     qInitial = normalize_quaternion(qInitial, 'solve_minimax_attitude_slew_fast:InvalidInitialQuaternion');
     qTarget = normalize_quaternion(qTarget, 'solve_minimax_attitude_slew_fast:InvalidTargetQuaternion');
@@ -36,7 +44,7 @@ function result = solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, q
             omegaInitialBody(axisIdx), omegaTargetBody(axisIdx), principalInertia(axisIdx), maneuverDuration);
     end
 
-    gamma = max([axisPlans.peakTorqueAbs]);
+    gamma = max([axisPlans.peakTorqueAbs]' ./ momentArms);
     switchTimes = [axisPlans.switchTime]';
     switchFractions = switchTimes / maneuverDuration;
 
@@ -50,7 +58,7 @@ function result = solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, q
     qVerify = relative_rotation_history_to_quaternions(qInitial, rotationVectorVerify);
 
     certification = struct();
-    certification.objective = 'minimize max_i sup_t |tau_i(t)|';
+    certification.objective = 'minimize max_i sup_t |tau_i(t) / L_i|';
     certification.model = 'principal-axis double-integrator with diagonal inertia';
     certification.lowerBound = gamma;
     certification.upperBound = gamma;
@@ -90,7 +98,9 @@ function result = solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, q
     result.switchTimes = switchTimes;
     result.switchFractions = switchFractions;
     result.axisPlans = axisPlans;
+    result.momentArms = momentArms;
     result.peakAxisTorqueAbs = reshape([axisPlans.peakTorqueAbs], [], 1);
+    result.peakAxisForceAbs = result.peakAxisTorqueAbs ./ momentArms;
     result.peakAxisAccelerationAbs = reshape([axisPlans.peakAccelerationAbs], [], 1);
     result.maxTorqueNodeComponentAbs = max(max(abs(tauNodes)));
     result.maxTorqueVerifyComponentAbs = max(max(abs(tauVerify)));
@@ -101,16 +111,16 @@ function result = solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, q
     result.terminalRotationVectorError = rotationVectorVerify(end, :)' - relativeRotationVectorBody;
     result.maxEqualityResidual = max(abs([result.terminalRotationVectorError; ...
         omegaVerifyBody(end, :)' - omegaTargetBody]));
-    result.maxInequalityViolation = max(max(max(abs(tauVerify), [], 1)' - gamma), 0);
+    result.maxInequalityViolation = max(max(max(abs(tauVerify), [], 1)' ./ momentArms - gamma), 0);
 
     if parser.Results.refineNonlinear
         result = refine_nonlinear_solution(result, qInitial, omegaInitialBody, qTarget, ...
-            omegaTargetBody, inertiaBody, maneuverDuration, parser.Results.nRefinementIntervals);
+            omegaTargetBody, inertiaBody, maneuverDuration, parser.Results.nRefinementIntervals, momentArms);
     end
 end
 
 function result = refine_nonlinear_solution(result, qInitial, omegaInitialBody, qTarget, ...
-        omegaTargetBody, inertiaBody, maneuverDuration, nRefinementIntervals)
+        omegaTargetBody, inertiaBody, maneuverDuration, nRefinementIntervals, momentArms)
     refineTimer = tic;
     intervalCandidates = unique(reshape(nRefinementIntervals, 1, []));
     angleToleranceDeg = 5e-2;
@@ -140,11 +150,11 @@ function result = refine_nonlinear_solution(result, qInitial, omegaInitialBody, 
         timeNodes = linspace(0, maneuverDuration, nIntervalsCandidate + 1)';
         intervalMidpoints = 0.5 * (timeNodes(1:end - 1) + timeNodes(2:end));
         tauGuess = interp1(tauGuessSourceTime, tauGuessSourceNodes, intervalMidpoints, 'previous', 'extrap');
-        gammaGuess = max(max(abs(tauGuess)));
+        gammaGuess = max(max(abs(tauGuess) ./ momentArms'));
         x0 = [max(gammaGuess, result.gamma); tauGuess(:)];
         objectiveFun = @(x) x(1);
         nonlinearConstraintFun = @(x) refinement_constraints(x, qInitial, omegaInitialBody, ...
-            qTarget, omegaTargetBody, inertiaBody, maneuverDuration);
+            qTarget, omegaTargetBody, inertiaBody, maneuverDuration, momentArms);
         lb = [0; -inf(size(tauGuess(:)))];
 
         try
@@ -159,7 +169,7 @@ function result = refine_nonlinear_solution(result, qInitial, omegaInitialBody, 
 
         tauIntervals = reshape(xOpt(2:end), nIntervalsCandidate, 3);
         candidateResult = build_refined_result(result, tauIntervals, qInitial, omegaInitialBody, ...
-            qTarget, omegaTargetBody, inertiaBody, maneuverDuration, timeNodes, output, optimizerExitflag);
+            qTarget, omegaTargetBody, inertiaBody, maneuverDuration, timeNodes, output, optimizerExitflag, momentArms);
         candidateMetric = refinement_metric(candidateResult.terminalAngleErrorDeg, ...
             candidateResult.terminalRateErrorDegPerSec);
         accepted = candidateResult.terminalAngleErrorDeg <= angleToleranceDeg && ...
@@ -207,7 +217,7 @@ function result = refine_nonlinear_solution(result, qInitial, omegaInitialBody, 
 end
 
 function result = build_refined_result(baseResult, tauIntervals, qInitial, omegaInitialBody, qTarget, ...
-        omegaTargetBody, inertiaBody, maneuverDuration, timeNodes, output, optimizerExitflag)
+        omegaTargetBody, inertiaBody, maneuverDuration, timeNodes, output, optimizerExitflag, momentArms)
     [qNodes, omegaNodesBody] = simulate_piecewise_constant_torque(qInitial, omegaInitialBody, tauIntervals, ...
         inertiaBody, timeNodes);
     timeVerify = linspace(0, maneuverDuration, max(200, 10 * size(tauIntervals, 1) + 1))';
@@ -215,7 +225,7 @@ function result = build_refined_result(baseResult, tauIntervals, qInitial, omega
         inertiaBody, timeVerify);
     tauNodes = sample_piecewise_constant_torque(tauIntervals, timeNodes, timeNodes);
     tauVerify = sample_piecewise_constant_torque(tauIntervals, timeNodes, timeVerify);
-    gammaRefined = max(max(abs(tauIntervals)));
+    gammaRefined = max(max(abs(tauIntervals) ./ momentArms'));
     terminalQuaternionError = terminal_quaternion_error_vector(qVerify(end, :)', qTarget);
     terminalRateError = omegaVerifyBody(end, :)' - omegaTargetBody;
 
@@ -237,7 +247,7 @@ function result = build_refined_result(baseResult, tauIntervals, qInitial, omega
     result.terminalRateErrorDegPerSec = norm(rad2deg(terminalRateError));
     result.terminalRotationVectorError = terminalQuaternionError;
     result.maxEqualityResidual = max(abs([terminalQuaternionError; terminalRateError]));
-    result.maxInequalityViolation = max(max(max(abs(tauIntervals)) - gammaRefined), 0);
+    result.maxInequalityViolation = max(max(max(abs(tauIntervals) ./ momentArms') - gammaRefined), 0);
     result.solverUsed = sprintf('%s + nonlinear direct shooting refinement', baseResult.solverUsed);
     result.message = sprintf('Analytic warm start refined with fmincon SQP (exitflag=%d).', optimizerExitflag);
     result.exitflag = optimizerExitflag;
@@ -254,14 +264,15 @@ function tf = is_valid_interval_vector(value)
 end
 
 function [c, ceq] = refinement_constraints(x, qInitial, omegaInitialBody, qTarget, ...
-        omegaTargetBody, inertiaBody, maneuverDuration)
+        omegaTargetBody, inertiaBody, maneuverDuration, momentArms)
     gamma = x(1);
     tauIntervals = reshape(x(2:end), [], 3);
     [qHistory, omegaHistory] = simulate_piecewise_constant_torque(qInitial, omegaInitialBody, tauIntervals, ...
         inertiaBody, maneuverDuration);
     terminalQuaternionError = terminal_quaternion_error_vector(qHistory(end, :)', qTarget);
     terminalRateError = omegaHistory(end, :)' - omegaTargetBody;
-    c = abs(tauIntervals(:)) - gamma;
+    scaledTau = tauIntervals ./ momentArms';
+    c = abs(scaledTau(:)) - gamma;
     ceq = [terminalQuaternionError; terminalRateError];
 end
 

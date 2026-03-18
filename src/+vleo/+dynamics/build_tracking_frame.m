@@ -1,6 +1,6 @@
-function rBodyToEci = build_tracking_frame(rSat, vSat, rVolcano, vVolcano)
-    rRel = rVolcano - rSat;
-    vRel = vVolcano - vSat;
+function rBodyToEci = build_tracking_frame(rSat, vSat, rTarget, vTarget)
+    rRel = rTarget - rSat;
+    vRel = vTarget - vSat;
 
     zBody = rRel / norm(rRel);
     dist = norm(rRel);

@@ -11,7 +11,19 @@ if ~exist('generateVisuals', 'var')
     generateVisuals = usejava('desktop');
 end
 
-clearvars -except demoSeed generateVisuals
+if ~exist('optimizeTargetRoll', 'var')
+    optimizeTargetRoll = true;
+end
+
+if ~exist('rollOptimizationTol', 'var')
+    rollOptimizationTol = 0.01;
+end
+
+if ~exist('maxRollIterations', 'var')
+    maxRollIterations = 20;
+end
+
+clearvars -except demoSeed generateVisuals optimizeTargetRoll rollOptimizationTol maxRollIterations
 clc;
 
 if isempty(demoSeed)
@@ -29,6 +41,7 @@ else
 end
 
 vehicle = vleo.dynamics.default_vehicle_config();
+momentArms = [0.3; 0.3; 0.2];
 cameraBody = [0; 0; 1];
 
 initialBrightness = 1.0;
@@ -47,11 +60,23 @@ odeOpts = odeset('RelTol', 1e-9, 'AbsTol', 1e-10);
 initialTargetEci = random_unit_vector();
 supernovaTargetEci = random_unit_vector();
 qInitial = camera_pointing_quaternion(initialTargetEci);
-qTarget = camera_pointing_quaternion(supernovaTargetEci);
+
+if optimizeTargetRoll
+    fprintf('=== Target Roll Angle Optimization ===\n');
+    [qTarget, optimalRollDeg, gammaHistory] = optimize_target_roll( ...
+        qInitial, omegaInitialBody, supernovaTargetEci, omegaTargetBody, ...
+        vehicle.inertiaBody, maneuverDurationSec, rollOptimizationTol, maxRollIterations, momentArms);
+    fprintf('Optimal roll angle: %.2f deg (from %d iterations)\n', optimalRollDeg, numel(gammaHistory));
+    fprintf('Gamma improvement: %.3e -> %.3e N (%.1f%% reduction)\n', ...
+        gammaHistory(1), gammaHistory(end), 100*(gammaHistory(1)-gammaHistory(end))/gammaHistory(1));
+else
+    qTarget = camera_pointing_quaternion(supernovaTargetEci);
+end
 
 result = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qTarget, ...
     omegaTargetBody, vehicle.inertiaBody, maneuverDurationSec, 40, ...
-    'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20]);
+    'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20], ...
+    'momentArms', momentArms);
 [tReplay, xReplay] = simulate_replay(result, qInitial, omegaInitialBody, vehicle.inertiaBody, odeOpts);
 actualPointingEci = pointing_history_from_quaternions(xReplay(:, 1:4), cameraBody);
 actualPointingErrorDeg = pointing_error_history_deg(actualPointingEci, supernovaTargetEci);
@@ -72,7 +97,7 @@ brightnessHistory = initialBrightness * exp(-tReplay / brightnessDecayTimeSec);
 [raTargetDeg, decTargetDeg] = direction_to_ra_dec_deg(supernovaTargetEci);
 separationDeg = rad2deg(acos(vleo.util.clamp_scalar(dot(initialTargetEci, supernovaTargetEci), -1, 1)));
 
-fprintf('=== SUPERNOVA REPOINT DEMO ===\n');
+fprintf('\n=== SUPERNOVA REPOINT DEMO ===\n');
 fprintf('Demo seed: %s\n', demoSeedText);
 fprintf('Initial and event directions are sampled independently and uniformly on the celestial sphere.\n');
 fprintf('Initial target RA/Dec: [%.2f, %.2f] deg\n', raInitialDeg, decInitialDeg);
@@ -81,7 +106,7 @@ fprintf('Angular separation: %.2f deg\n', separationDeg);
 fprintf('Brightness threshold time: %.2f s\n', latestUsableTimeSec);
 fprintf('Planned maneuver duration: %.2f s\n', maneuverDurationSec);
 fprintf('Solver runtime: %.3f ms\n', 1e3 * result.solveTimeSec);
-fprintf('Peak component torque gamma: %.3e N m\n', result.gamma);
+fprintf('Peak component force gamma: %.3e N\n', result.gamma);
 fprintf('Planned terminal attitude error: %.3e deg\n', result.terminalAngleErrorDeg);
 fprintf('Nonlinear replay terminal attitude error: %.3e deg\n', finalAttitudeErrorDeg);
 fprintf('Nonlinear replay terminal rate error: %.3e deg/s\n', finalRateErrorDegPerSec);
@@ -100,9 +125,14 @@ else
 end
 
 if generateVisuals
+    nPlots = 2;
+    if optimizeTargetRoll
+        nPlots = 3;
+    end
+    
     figure('Name', 'Supernova Repoint Demo', 'Color', 'w');
 
-    subplot(2, 2, 1);
+    subplot(2, nPlots, 1);
     plot(tReplay, brightnessHistory, 'LineWidth', 1.6, 'Color', [0.85, 0.35, 0.15]);
     hold on;
     yline(brightnessThreshold, '--k', 'Threshold', 'LineWidth', 1.0);
@@ -115,7 +145,7 @@ if generateVisuals
     ylabel('Relative brightness');
     title('Supernova brightness window');
 
-    subplot(2, 2, 2);
+    subplot(2, nPlots, 2);
     plot(result.timeVerify, plannedPointingErrorDeg, '--', 'LineWidth', 1.2, 'Color', [0.2, 0.4, 0.75], ...
         'DisplayName', 'planned');
     hold on;
@@ -128,20 +158,27 @@ if generateVisuals
     title('Camera repoint performance');
     legend('Location', 'best');
 
-    subplot(2, 2, 3);
-    plot(result.timeVerify, result.tauVerify(:, 1), 'LineWidth', 1.3, 'DisplayName', 'tau_x');
+    if optimizeTargetRoll
+        subplot(2, nPlots, 3);
+        plot(0:numel(gammaHistory)-1, gammaHistory, 'o-', 'LineWidth', 1.5, 'MarkerSize', 6);
+        grid on;
+        xlabel('Iteration');
+        ylabel('\gamma [N]');
+        title('Peak force optimization');
+    end
+
+    subplot(2, nPlots, nPlots+1);
+    plot(result.timeVerify, result.tauVerify(:, 1), 'LineWidth', 1.3, 'DisplayName', '\tau_x');
     hold on;
-    plot(result.timeVerify, result.tauVerify(:, 2), 'LineWidth', 1.3, 'DisplayName', 'tau_y');
-    plot(result.timeVerify, result.tauVerify(:, 3), 'LineWidth', 1.3, 'DisplayName', 'tau_z');
-    yline(result.gamma, '--k', 'gamma', 'LineWidth', 1.0);
-    yline(-result.gamma, '--k', 'LineWidth', 1.0, 'HandleVisibility', 'off');
+    plot(result.timeVerify, result.tauVerify(:, 2), 'LineWidth', 1.3, 'DisplayName', '\tau_y');
+    plot(result.timeVerify, result.tauVerify(:, 3), 'LineWidth', 1.3, 'DisplayName', '\tau_z');
     grid on;
     xlabel('Time [s]');
     ylabel('Torque [N m]');
-    title('Certified minimax torque command');
+    title('Minimax force-constrained torque command');
     legend('Location', 'best');
 
-    subplot(2, 2, 4);
+    subplot(2, nPlots, nPlots+2);
     plot(result.timeVerify, rad2deg(result.omegaVerifyBody(:, 1)), '--', 'LineWidth', 1.1, 'Color', [0.2, 0.4, 0.75], ...
         'HandleVisibility', 'off');
     hold on;
@@ -149,14 +186,115 @@ if generateVisuals
         'HandleVisibility', 'off');
     plot(result.timeVerify, rad2deg(result.omegaVerifyBody(:, 3)), '--', 'LineWidth', 1.1, 'Color', [0.85, 0.35, 0.2], ...
         'HandleVisibility', 'off');
-    plot(tReplay, rad2deg(xReplay(:, 5)), 'LineWidth', 1.3, 'Color', [0.2, 0.4, 0.75], 'DisplayName', 'omega_x');
-    plot(tReplay, rad2deg(xReplay(:, 6)), 'LineWidth', 1.3, 'Color', [0.25, 0.6, 0.35], 'DisplayName', 'omega_y');
-    plot(tReplay, rad2deg(xReplay(:, 7)), 'LineWidth', 1.3, 'Color', [0.85, 0.35, 0.2], 'DisplayName', 'omega_z');
+    plot(tReplay, rad2deg(xReplay(:, 5)), 'LineWidth', 1.3, 'Color', [0.2, 0.4, 0.75], 'DisplayName', '\omega_x');
+    plot(tReplay, rad2deg(xReplay(:, 6)), 'LineWidth', 1.3, 'Color', [0.25, 0.6, 0.35], 'DisplayName', '\omega_y');
+    plot(tReplay, rad2deg(xReplay(:, 7)), 'LineWidth', 1.3, 'Color', [0.85, 0.35, 0.2], 'DisplayName', '\omega_z');
     grid on;
     xlabel('Time [s]');
     ylabel('Body rate [deg/s]');
     title('Nonlinear body-rate replay');
     legend('Location', 'best');
+end
+
+function [qOptimal, optimalRollDeg, gammaHistory] = optimize_target_roll( ...
+        qInitial, omegaInitialBody, targetEci, omegaTargetBody, inertiaBody, ...
+        maneuverDurationSec, tol, maxIterations, momentArms)
+    
+    gammaHistory = [];
+    optimalRollDeg = 0;
+    qOptimal = camera_pointing_quaternion_with_roll(targetEci, 0);
+    
+    result = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qOptimal, ...
+        omegaTargetBody, inertiaBody, maneuverDurationSec, 40, 'refineNonlinear', false, ...
+        'momentArms', momentArms);
+    gammaHistory = [gammaHistory; result.gamma];
+
+    rollAnglesDeg = linspace(0, 360, 13);
+    bestGamma = result.gamma;
+    bestRollDeg = 0;
+
+    for rollDeg = rollAnglesDeg
+        qTest = camera_pointing_quaternion_with_roll(targetEci, rollDeg);
+        resultTest = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qTest, ...
+            omegaTargetBody, inertiaBody, maneuverDurationSec, 40, 'refineNonlinear', false, ...
+            'momentArms', momentArms);
+        if resultTest.gamma < bestGamma
+            bestGamma = resultTest.gamma;
+            bestRollDeg = rollDeg;
+        end
+    end
+    
+    optimalRollDeg = bestRollDeg;
+    qOptimal = camera_pointing_quaternion_with_roll(targetEci, optimalRollDeg);
+    
+    result = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qOptimal, ...
+        omegaTargetBody, inertiaBody, maneuverDurationSec, 40, 'refineNonlinear', false, ...
+        'momentArms', momentArms);
+    gammaHistory = [gammaHistory; result.gamma];
+
+    searchRadiusDeg = 22.5;
+    iteration = 0;
+    
+    while searchRadiusDeg > tol && iteration < maxIterations
+        iteration = iteration + 1;
+        improved = false;
+        
+        for delta = [-searchRadiusDeg, searchRadiusDeg]
+            testRollDeg = optimalRollDeg + delta;
+            qTest = camera_pointing_quaternion_with_roll(targetEci, testRollDeg);
+            resultTest = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qTest, ...
+                omegaTargetBody, inertiaBody, maneuverDurationSec, 40, 'refineNonlinear', false, ...
+                'momentArms', momentArms);
+            
+            if resultTest.gamma < bestGamma - 1e-10
+                bestGamma = resultTest.gamma;
+                bestRollDeg = testRollDeg;
+                optimalRollDeg = testRollDeg;
+                qOptimal = qTest;
+                improved = true;
+            end
+        end
+        
+        gammaHistory = [gammaHistory; bestGamma];
+        
+        if ~improved
+            searchRadiusDeg = searchRadiusDeg / 2;
+        end
+    end
+    
+    qOptimal = camera_pointing_quaternion_with_roll(targetEci, optimalRollDeg);
+end
+
+function q = camera_pointing_quaternion_with_roll(pointingEci, rollDeg)
+    pointingEci = pointingEci / norm(pointingEci);
+    
+    referenceEci = [0; 0; 1];
+    if abs(dot(referenceEci, pointingEci)) > 0.95
+        referenceEci = [1; 0; 0];
+    end
+    
+    xBodyInEci = referenceEci - dot(referenceEci, pointingEci) * pointingEci;
+    xBodyInEci = xBodyInEci / norm(xBodyInEci);
+    yBodyInEci = cross(pointingEci, xBodyInEci);
+    yBodyInEci = yBodyInEci / norm(yBodyInEci);
+    zBodyInEci = pointingEci;
+    
+    rollRad = deg2rad(rollDeg);
+    c = cos(rollRad);
+    s = sin(rollRad);
+    xBodyRotated = c * xBodyInEci + s * yBodyInEci;
+    yBodyRotated = -s * xBodyInEci + c * yBodyInEci;
+    
+    rBodyToEci = [xBodyRotated, yBodyRotated, zBodyInEci];
+    q = dcm2quat(rBodyToEci')';
+    q = q / norm(q);
+    if q(1) < 0
+        q = -q;
+    end
+end
+
+function q = camera_pointing_quaternion(pointingEci)
+    q = camera_pointing_quaternion_with_roll(pointingEci, 0);
 end
 
 function xDot = rigid_body_attitude_dynamics(t, x, torqueInterp, inertiaBody)
@@ -185,27 +323,6 @@ function qDot = quaternion_kinematics(qScalarFirst, omegaBody)
         omegaBody(2), -omegaBody(3), 0, omegaBody(1); ...
         omegaBody(3), omegaBody(2), -omegaBody(1), 0];
     qDot = 0.5 * omegaMatrix * qScalarFirst;
-end
-
-function q = camera_pointing_quaternion(pointingEci)
-    pointingEci = pointingEci / norm(pointingEci);
-    referenceEci = [0; 0; 1];
-    if abs(dot(referenceEci, pointingEci)) > 0.95
-        referenceEci = [1; 0; 0];
-    end
-
-    xBodyInEci = referenceEci - dot(referenceEci, pointingEci) * pointingEci;
-    xBodyInEci = xBodyInEci / norm(xBodyInEci);
-    yBodyInEci = cross(pointingEci, xBodyInEci);
-    yBodyInEci = yBodyInEci / norm(yBodyInEci);
-    zBodyInEci = pointingEci;
-
-    rBodyToEci = [xBodyInEci, yBodyInEci, zBodyInEci];
-    q = dcm2quat(rBodyToEci')';
-    q = q / norm(q);
-    if q(1) < 0
-        q = -q;
-    end
 end
 
 function pointingHistory = pointing_history_from_quaternions(qHistory, cameraBody)

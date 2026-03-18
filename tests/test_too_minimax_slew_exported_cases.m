@@ -1,25 +1,25 @@
-function results = test_volcano_minimax_slew_exported_cases()
-% TEST_VOLCANO_MINIMAX_SLEW_EXPORTED_CASES Data-driven regression using exported volcano minimax slew cases.
+function results = test_too_minimax_slew_exported_cases()
+% TEST_TOO_MINIMAX_SLEW_EXPORTED_CASES Data-driven regression using exported TOO minimax slew cases.
 
     projectRoot = fileparts(fileparts(mfilename('fullpath')));
     addpath(projectRoot);
     setup_project();
 
     results = struct('passed', 0, 'failed', 0, 'tests', {{}});
-    results = run_test(results, @test_exported_volcano_minimax_slew_cases);
+    results = run_test(results, @test_exported_too_minimax_slew_cases);
     print_summary(results);
 end
 
-function passed = test_exported_volcano_minimax_slew_cases()
-    caseBundlePath = fullfile(vleo.util.generated_data_dir(), 'volcano_minimax_slew_solver_cases.mat');
+function passed = test_exported_too_minimax_slew_cases()
+    caseBundlePath = fullfile(vleo.util.generated_data_dir(), 'too_minimax_slew_solver_cases.mat');
     if ~exist(caseBundlePath, 'file')
-        error('test_volcano_minimax_slew_exported_cases:MissingCaseBundle', ...
-            'Missing exported case bundle. Run scripts/export_volcano_minimax_slew_cases.m first.');
+        error('test_too_minimax_slew_exported_cases:MissingCaseBundle', ...
+            'Missing exported case bundle. Run scripts/export_too_minimax_slew_cases.m first.');
     end
 
     data = load(caseBundlePath, 'cases', 'metadata');
     if ~isfield(data, 'cases') || isempty(data.cases)
-        error('test_volcano_minimax_slew_exported_cases:EmptyCaseBundle', ...
+        error('test_too_minimax_slew_exported_cases:EmptyCaseBundle', ...
             'The exported case bundle does not contain any solver cases.');
     end
 
@@ -28,7 +28,7 @@ function passed = test_exported_volcano_minimax_slew_cases()
     rateToleranceDegPerSec = 5e-3;
     passMask = true(numel(data.cases), 1);
 
-    fprintf('Loaded %d exported volcano minimax slew cases from %s\n', numel(data.cases), caseBundlePath);
+    fprintf('Loaded %d exported TOO minimax slew cases from %s\n', numel(data.cases), caseBundlePath);
     if isfield(data, 'metadata') && isfield(data.metadata, 'createdAt')
         fprintf('Case bundle created at: %s\n', data.metadata.createdAt);
     end

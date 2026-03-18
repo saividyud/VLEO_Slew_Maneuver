@@ -5,3 +5,5 @@
 
 # Generated MATLAB artifacts do not belong in source packages.
 /src/**/*.mat
+# CocoIndex Code (ccc)
+/.cocoindex_code/

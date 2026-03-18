@@ -2,6 +2,10 @@ clear
 clc
 close all
 
+projectRoot = fileparts(fileparts(mfilename('fullpath')));
+addpath(projectRoot);
+setup_project();
+
 %% Initializing video writer
 save = false;
 
@@ -12,8 +16,10 @@ if save
     open(v);
 end
 
+c = vleo.util.constants();
+
 %% Initial state (in Keplerian orbital elements)
-a = 250e3 + earthRadius; % 250 km above Earth semimajor axis
+a = 250e3 + c.R_earth; % 250 km above Earth semimajor axis
 e = 0; % Eccentricity
 i = 0; % Inclination
 raan = 0; % Right ascension of ascending node
@@ -47,7 +53,7 @@ beta_i = QfromDCM(R_BI_i)'; % Initial quaternion
 omega_i = [0, 0, 0]; % Initial angular rate
 
 X_i = [r_i, v_i, beta_i, omega_i]';
-Xr = [0, 0, 6678e3, -7789, 0, 0, 1, 0 , 0, 0, 0, 0, 0]';
+Xr = [1; 0; 0; 0; 0; 0; 0];% Reference: identity quaternion, zero angular rate
 %% Simulating
 % Simualation bounds
 t0 = 0;
@@ -110,7 +116,7 @@ ylabel(ax1, 'Y Position (m)');
 zlabel(ax1, 'Z Position (m)');
 title(ax1, 'Satellite Trajectory');
 
-bounds = 1.1 * earthRadius;
+bounds = 1.1 * c.R_earth;
 xlim(ax1, [-bounds, bounds])
 ylim(ax1, [-bounds, bounds])
 zlim(ax1, [-bounds, bounds])

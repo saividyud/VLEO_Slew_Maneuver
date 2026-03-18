@@ -20,6 +20,7 @@ clc;
 rng(benchmarkSeed, 'twister');
 vehicle = vleo.dynamics.default_vehicle_config();
 principalInertia = diag(vehicle.inertiaBody);
+momentArms = [0.3; 0.3; 0.2];
 nVerifyCases = min(12, nBenchmarkCases);
 
 solveTimesSec = zeros(nBenchmarkCases, 1);
@@ -35,13 +36,15 @@ fprintf('=== FAST MINIMAX ATTITUDE SLEW BENCHMARK ===\n');
 fprintf('Benchmark seed: %d\n', benchmarkSeed);
 fprintf('Cases: %d\n', nBenchmarkCases);
 fprintf('Dense verification subset: %d\n', nVerifyCases);
-fprintf('Principal inertias [kg m^2]: [%.4f, %.4f, %.4f]\n\n', principalInertia);
+fprintf('Principal inertias [kg m^2]: [%.4f, %.4f, %.4f]\n', principalInertia);
+fprintf('Moment arms [m]: [%.2f, %.2f, %.2f]\n\n', momentArms);
 
 for caseIdx = 1:nBenchmarkCases
     [qInitial, qTarget, omegaInitialBody, omegaTargetBody, maneuverDuration, rotationAngleDeg] = random_case();
 
     result = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qTarget, ...
-        omegaTargetBody, vehicle.inertiaBody, maneuverDuration, 24);
+        omegaTargetBody, vehicle.inertiaBody, maneuverDuration, 24, ...
+        'momentArms', momentArms);
 
     solveTimesSec(caseIdx) = result.solveTimeSec;
     rotationAnglesDeg(caseIdx) = rotationAngleDeg;
@@ -53,9 +56,10 @@ for caseIdx = 1:nBenchmarkCases
     if caseIdx <= nVerifyCases
         denseGamma = 0;
         for axisIdx = 1:3
-            denseGamma = max(denseGamma, dense_axis_peak_torque( ...
+            axisPeakTorque = dense_axis_peak_torque( ...
                 result.relativeRotationVectorBody(axisIdx), omegaInitialBody(axisIdx), ...
-                omegaTargetBody(axisIdx), principalInertia(axisIdx), maneuverDuration));
+                omegaTargetBody(axisIdx), principalInertia(axisIdx), maneuverDuration);
+            denseGamma = max(denseGamma, axisPeakTorque / momentArms(axisIdx));
         end
         denseVerifierGamma(caseIdx) = denseGamma;
     end
@@ -73,8 +77,8 @@ fprintf('95th percentile solve time: %.3f ms\n', percentile95SolveMs);
 fprintf('Worst solve time: %.3f ms\n', maxSolveMs);
 fprintf('Max terminal attitude error in solver model: %.3e deg\n', maxTerminalAngleErrorDeg);
 fprintf('Max terminal rate error in solver model: %.3e deg/s\n', maxTerminalRateErrorDegPerSec);
-fprintf('Max dense-verifier gamma mismatch: %.3e N m\n', maxDenseMismatch);
-fprintf('Peak commanded torque range: [%.3e, %.3e] N m\n', min(peakTorqueAbs), max(peakTorqueAbs));
+fprintf('Max dense-verifier gamma mismatch: %.3e N\n', maxDenseMismatch);
+fprintf('Peak commanded force range: [%.3e, %.3e] N\n', min(peakTorqueAbs), max(peakTorqueAbs));
 fprintf('Rotation-angle range: [%.2f, %.2f] deg\n', min(rotationAnglesDeg), max(rotationAnglesDeg));
 fprintf('Maneuver-duration range: [%.2f, %.2f] s\n', min(maneuverDurationsSec), max(maneuverDurationsSec));
 
@@ -104,7 +108,7 @@ if generateVisuals
         'DisplayName', 'dense verifier');
     grid on;
     xlabel('Verification case');
-    ylabel('Peak torque [N m]');
+    ylabel('Peak force [N]');
     title('Analytic gamma vs dense verifier');
     legend('Location', 'best');
 
@@ -112,8 +116,8 @@ if generateVisuals
     scatter(maneuverDurationsSec, peakTorqueAbs, 24, rotationAnglesDeg, 'filled');
     grid on;
     xlabel('Maneuver duration [s]');
-    ylabel('Peak component torque [N m]');
-    title('Torque demand across benchmark set');
+    ylabel('Peak component force [N]');
+    title('Force demand across benchmark set');
     colorbar;
 end
 

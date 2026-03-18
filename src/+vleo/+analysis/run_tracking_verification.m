@@ -1,5 +1,5 @@
 function verification = run_tracking_verification(tspan, xHistory, trackingHistory, visibilityInfo, ...
-        rVolcano0, tauControlHistory, tauAeroHistory, params, odeOpts)
+        rTOO0, tauControlHistory, tauAeroHistory, params, odeOpts)
     verification = struct( ...
         'plotTime', tspan(:), ...
         'plotDesiredEulerDeg', trackingHistory.euler_track_history_deg, ...
@@ -19,9 +19,9 @@ function verification = run_tracking_verification(tspan, xHistory, trackingHisto
     rSat0 = xHistory(idxStart, 1:3)';
     vSat0 = xHistory(idxStart, 4:6)';
 
-    [rVolcanoAtTime0, vVolcanoAtTime0] = vleo.dynamics.volcano_state_at_time(t0Verif, rVolcano0, params.omega_earth);
-    rRel0 = rVolcanoAtTime0 - rSat0;
-    vRel0 = vVolcanoAtTime0 - vSat0;
+    [rTOOAtTime0, vTOOAtTime0] = vleo.dynamics.too_state_at_time(t0Verif, rTOO0, params.omega_earth);
+    rRel0 = rTOOAtTime0 - rSat0;
+    vRel0 = vTOOAtTime0 - vSat0;
 
     zBody0 = rRel0 / norm(rRel0);
     dist0 = norm(rRel0);
@@ -60,8 +60,8 @@ function verification = run_tracking_verification(tspan, xHistory, trackingHisto
         decVerifHistory(k) = obsVerif.dec;
     end
 
-    raTargetHistory = trackingHistory.ra_volcano_history(idxStart:idxEnd);
-    decTargetHistory = trackingHistory.dec_volcano_history(idxStart:idxEnd);
+    raTargetHistory = trackingHistory.ra_TOO_history(idxStart:idxEnd);
+    decTargetHistory = trackingHistory.dec_TOO_history(idxStart:idxEnd);
     verification.ra_error = mod(raVerifHistory - raTargetHistory + 180, 360) - 180;
     verification.dec_error = decVerifHistory - decTargetHistory;
 end

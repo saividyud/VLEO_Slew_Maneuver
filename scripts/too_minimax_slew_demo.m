@@ -1,6 +1,6 @@
-% Control Test 4 - Nadir Hold, Minimax Slew, and Volcano Tracking
-% Holds nadir pointing before eruption, slews with a minimax torque profile,
-% then matches the volcano-tracking attitude/rate so tracking can continue.
+% Control Test 4 - Nadir Hold, Minimax Slew, and Target of Opportunity (TOO) Tracking
+% Holds nadir pointing before event, slews with a minimax torque profile,
+% then matches the TOO-tracking attitude/rate so tracking can continue.
 
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectRoot);
@@ -60,16 +60,16 @@ end
 generateVisuals = logical(generateVisuals);
 
 params = vleo.dynamics.default_control_test_params(includeAerodynamics);
-scenario = vleo.analysis.generate_volcano_scenario(params);
+scenario = vleo.analysis.generate_too_scenario(params);
 
-fprintf('=== VOLCANO OBSERVATION WITH MINIMAX ATTITUDE SLEW ===\n');
+fprintf('=== TOO OBSERVATION WITH MINIMAX ATTITUDE SLEW ===\n');
 fprintf('Spacecraft: 6U CubeSat (10 x 20 x 30 cm, 12 kg, uniform density)\n');
 fprintf('Aerodynamic disturbance torque estimate: %s\n', vleo.util.on_off_text(params.includeAerodynamics));
 fprintf('Scenario seed: %s\n', scenarioSeedText);
 fprintf('Principal inertias [kg m^2]: [%.4f, %.4f, %.4f]\n\n', diag(params.I_CB));
 
-fprintf('Volcano erupts at t = 0\n');
-fprintf('Volcano Location (at t=0): Lat=%.2f deg, Lon=%.2f deg\n', scenario.volcano_lat, scenario.volcano_lon);
+fprintf('TOO event at t = 0\n');
+fprintf('TOO Location (at t=0): Lat=%.2f deg, Lon=%.2f deg\n', scenario.too_lat, scenario.too_lon);
 fprintf('Orbital Period: %.2f minutes\n', scenario.orbital_period / 60);
 fprintf('Orbital Altitude: %.2f km\n', scenario.altitude / 1000);
 fprintf('Max horizon angle (theta_max): %.2f degrees\n', rad2deg(scenario.theta_max));
@@ -88,9 +88,9 @@ odeFun = @(t, X) vleo.dynamics.sat_dynamics_controlled(t, X, scenario.z_body_eci
 n_steps = size(X_orbit_history, 1);
 idx_eruption = find(abs(tspan - scenario.t_eruption) < 1e-12, 1, 'first');
 
-trackingHistory = vleo.analysis.compute_observation_history(tspan, X_orbit_history, scenario.r_volcano_0, params);
-ra_volcano_history = trackingHistory.ra_volcano_history;
-dec_volcano_history = trackingHistory.dec_volcano_history;
+trackingHistory = vleo.analysis.compute_observation_history(tspan, X_orbit_history, scenario.r_too_0, params);
+ra_TOO_history = trackingHistory.ra_TOO_history;
+dec_TOO_history = trackingHistory.dec_TOO_history;
 visibility_history = trackingHistory.visibility_history;
 
 visibilityInfo = vleo.analysis.analyze_visibility(tspan, visibility_history);
@@ -99,36 +99,36 @@ idx_end_visible = visibilityInfo.idx_end_visible;
 
 if ~isempty(idx_start_visible)
     t_start_visible = visibilityInfo.t_start_visible;
-    fprintf('Satellite starts seeing volcano at t = %.2f s (%.2f min)\n', ...
+    fprintf('Satellite starts seeing TOO at t = %.2f s (%.2f min)\n', ...
         t_start_visible, t_start_visible / 60);
 else
     t_start_visible = NaN;
     if visibility_history(1)
-        fprintf('Volcano visible at simulation start\n');
+        fprintf('TOO visible at simulation start\n');
     else
-        fprintf('Volcano not visible at simulation start\n');
+        fprintf('TOO not visible at simulation start\n');
     end
 end
 
-fprintf('Volcano erupts at t = %.2f s (%.2f min)\n', scenario.t_eruption, scenario.t_eruption / 60);
+fprintf('TOO event starts at t = %.2f s (%.2f min)\n', scenario.t_eruption, scenario.t_eruption / 60);
 
 if ~isempty(idx_end_visible)
     t_end_visible = visibilityInfo.t_end_visible;
-    fprintf('Volcano goes out of sight at t = %.2f s (%.2f min)\n', ...
+    fprintf('TOO goes out of sight at t = %.2f s (%.2f min)\n', ...
         t_end_visible, t_end_visible / 60);
 else
     if visibility_history(end)
         error('control_test4:NoVisibilityEnd', ...
-            ['Volcano remains visible at simulation end, so the default match-time ', ...
+            ['TOO remains visible at simulation end, so the default match-time ', ...
              'rule is undefined in this window. Increase the simulation window.']);
     end
     error('control_test4:NoVisibilityEnd', ...
-        'Volcano is not visible after eruption in the current window.');
+        'TOO is not visible after event in the current window.');
 end
 
 if t_end_visible <= scenario.t_eruption
     error('control_test4:InvalidVisibilityWindow', ...
-        'The volcano is not visible long enough after eruption to define a post-eruption match time.');
+        'The TOO is not visible long enough after event to define a post-event match time.');
 end
 
 t_match_default = scenario.t_eruption + 0.75 * (t_end_visible - scenario.t_eruption);
@@ -169,7 +169,7 @@ omega_target_body = trackingHistory.omega_track_body_history(idx_match, :)';
 
 fprintf('Target tracking state at t_match:\n');
 fprintf('  Target camera RA/Dec: [%.3f, %.3f] deg\n', ...
-    ra_volcano_history(idx_match), dec_volcano_history(idx_match));
+    ra_TOO_history(idx_match), dec_TOO_history(idx_match));
 fprintf('  Target body-rate magnitude: %.3e rad/s\n\n', norm(omega_target_body));
 
 n_opt_intervals = 20;
@@ -177,12 +177,15 @@ fprintf('Solving fast rotational slew with %d output intervals...\n', n_opt_inte
 fprintf('Using an analytic warm start with nonlinear direct-shooting refinement.\n');
 opt_result = vleo.control.solve_minimax_attitude_slew_fast(q_initial, omega_initial_body, q_target, ...
     omega_target_body, params.I_CB, t_match - scenario.t_eruption, n_opt_intervals, ...
-    'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20]);
+    'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20], ...
+    'momentArms', params.momentArms);
 
 fprintf('Slew solver: %s\n', opt_result.solverUsed);
 fprintf('Optimization exit flag: %d\n', opt_result.exitflag);
 fprintf('Optimization message: %s\n', opt_result.message);
-fprintf('Peak component torque gamma: %.3e N m\n', opt_result.gamma);
+fprintf('Peak component force gamma: %.3e N\n', opt_result.gamma);
+fprintf('Peak axis forces [N]: [%.3e, %.3e, %.3e]\n', opt_result.peakAxisForceAbs);
+fprintf('Moment arms [m]: [%.2f, %.2f, %.2f]\n', params.momentArms);
 fprintf('Grid max |tau_i|: %.3e N m\n', opt_result.maxTorqueNodeComponentAbs);
 fprintf('Grid max ||tau||_2: %.3e N m\n', opt_result.maxTorqueNodeNorm);
 fprintf('Max equality residual: %.3e\n', opt_result.maxEqualityResidual);
@@ -268,15 +271,15 @@ for i = 1:n_steps
     pointing_eci_actual_history(i, :) = obs_actual.pointing_eci';
 
     r_sat = X_actual_history(i, 1:3)';
-    [rVolcano, ~] = vleo.dynamics.volcano_state_at_time(tspan(i), scenario.r_volcano_0, params.omega_earth);
-    apparentVolcanoVec = rVolcano - r_sat;
-    apparentVolcanoVec = apparentVolcanoVec / norm(apparentVolcanoVec);
-    pointing_error_deg_history(i) = rad2deg(acos(vleo.util.clamp_scalar(dot(obs_actual.pointing_eci, apparentVolcanoVec), -1, 1)));
+    [rTOO, ~] = vleo.dynamics.too_state_at_time(tspan(i), scenario.r_too_0, params.omega_earth);
+    apparentTOOVec = rTOO - r_sat;
+    apparentTOOVec = apparentTOOVec / norm(apparentTOOVec);
+    pointing_error_deg_history(i) = rad2deg(acos(vleo.util.clamp_scalar(dot(obs_actual.pointing_eci, apparentTOOVec), -1, 1)));
 end
 
 tracking_indices = idx_match:idx_end_visible;
-ra_error = mod(ra_camera_actual_history(tracking_indices) - ra_volcano_history(tracking_indices) + 180, 360) - 180;
-dec_error = dec_camera_actual_history(tracking_indices) - dec_volcano_history(tracking_indices);
+ra_error = mod(ra_camera_actual_history(tracking_indices) - ra_TOO_history(tracking_indices) + 180, 360) - 180;
+dec_error = dec_camera_actual_history(tracking_indices) - dec_TOO_history(tracking_indices);
 body_rate_tracking_error_deg_s = vecnorm(rad2deg(omega_body_actual_history(tracking_indices, :) - ...
     trackingHistory.omega_track_body_history(tracking_indices, :)), 2, 2);
 
@@ -296,9 +299,9 @@ fprintf('Max ||tau_aero||_2    = %.3e N m\n\n', max(vecnorm(tau_aero_history, 2,
 simulations_dir = vleo.util.simulations_dir();
 anim_data_file = fullfile(simulations_dir, sprintf('control_test4_anim_data_aero_%s_seed_%s.mat', ...
     vleo.util.on_off_text(params.includeAerodynamics), scenarioSeedText));
-r_volcano_0 = scenario.r_volcano_0;
+r_too_0 = scenario.r_too_0;
 save(anim_data_file, 'tspan', 'X_actual_history', 'visibility_history', ...
-    'pointing_eci_actual_history', 'r_volcano_0', 'params', 'tau_total_history', ...
+    'pointing_eci_actual_history', 'r_too_0', 'params', 'tau_total_history', ...
     'tau_control_history', 'tau_aero_history', 't_match');
 fprintf('Animation data saved to: %s\n', anim_data_file);
 fprintf('Simulation outputs directory: %s\n', simulations_dir);
@@ -416,7 +419,7 @@ function mark_phase_lines(ax, tStartVisible, tEruption, tMatch, tEndVisible, fon
         marker = xline(ax, tStartVisible / 60, 'g-', 'LineWidth', 1.5, 'Label', 'Start Visible', 'FontSize', fontSize);
         vleo.util.hide_from_legend(marker);
     end
-    marker = xline(ax, tEruption / 60, 'k--', 'LineWidth', 2, 'Label', 'Eruption', 'FontSize', fontSize);
+    marker = xline(ax, tEruption / 60, 'k--', 'LineWidth', 2, 'Label', 'TOO Event', 'FontSize', fontSize);
     vleo.util.hide_from_legend(marker);
     marker = xline(ax, tMatch / 60, 'c-.', 'LineWidth', 2, 'Label', 'State Match', 'FontSize', fontSize);
     vleo.util.hide_from_legend(marker);

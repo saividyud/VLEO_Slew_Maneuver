@@ -1,16 +1,10 @@
-<<<<<<< Updated upstream
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectRoot);
 setup_project();
-=======
+
 clear
 clc
 close all
->>>>>>> Stashed changes
-
-clc;
-clear;
-close all;
 
 c = vleo.util.constants();
 [t, X] = simulate_attitude_history(c);
@@ -20,7 +14,6 @@ for idx = 1:numel(t)
     torques(idx, :) = vleo.control.attitude_pd_controller(t(idx), X(idx, :)')';
 end
 
-<<<<<<< Updated upstream
 results = struct( ...
     't', t, ...
     'rs', X(:, 1:3), ...
@@ -47,66 +40,15 @@ function [t, X] = simulate_attitude_history(c)
     q0 = dcm2quat(rBodyFromInertial);
     if q0(1) < 0
         q0 = -q0;
-=======
-%% Initial state (in Keplerian orbital elements)
-a = 250e3 + earthRadius; % 250 km above Earth semimajor axis
-e = 0; % Eccentricity
-i = 0; % Inclination
-raan = 0; % Right ascension of ascending node
-aop = 0; % Argument of periapse
-ta = 0; % True anomaly
+    end
 
-orbit = [a, e, deg2rad(i), deg2rad(raan), deg2rad(aop), deg2rad(ta)];
+    X0 = [rvec(rEci); rvec(vEci); q0(:); 0; 0; 0];
+    opts = odeset('RelTol', 1e-12, 'AbsTol', 1e-12);
+    [t, X] = ode45(@vleo.dynamics.sat_dynamics_nonlinear, ts, X0, opts);
+end
 
-RV = RVfromOE(orbit);
-
-r_i = RV(:, 1)'; % [m]
-v_i = RV(:, 2)'; % [m/s]
-
-% Computing intial body frame such that b_1 is in the direction of motion,
-% b_3 is pointing towards surface (camera pointing), and b_2 is normal to
-% both b_3 and b_1
-b_1_i = v_i' / norm(v_i);
-b_3_i = -r_i' / norm(r_i);
-b_2_i = cross(b_3_i, b_1_i); % Calculate b_2 as the cross product of b_3 and b_1
-
-% Computing initial quaternion from these initial body axes
-R_BI_i = [
-    b_1_i';
-    b_2_i';
-    b_3_i'
-];
-
-beta_i = QfromDCM(R_BI_i)'; % Initial quaternion
-
-% Zero initial angular spin
-omega_i = [0, 0, 0]; % Initial angular rate
-
-X_i = [r_i, v_i, beta_i, omega_i]';
-
-%% Simulating
-% Simualation bounds
-t0 = 0;
-t_span = 6*60; % 0.5 hour
-dt = 1;
-
-ts = t0 : dt : t_span;
-
-opts = odeset('RelTol', 1e-6,'AbsTol', 1e-6);
-[t, X] = ode45(@vleo.dynamics.sat_dynamics_nonlinear, ts, X_i, opts);
-
-% Extract position and velocity from the state vector
-rs = X(:, 1:3);
-vs = X(:, 4:6);
-betas = X(:, 7:10);
-omegas = X(:, 11:13);
-
-% Extract torques
-torques = zeros(length(rs), 3);
-torques_norm = zeros(length(rs),1);
-for i = 1 : 1 : length(rs)
-    torques(i, :) = vleo.control.attitude_pd_controller(ts(i), X(i, :)')';
-    torques_norm(i) = norm(torques(i,:));
+function v = rvec(v)
+    v = reshape(v, [], 1);
 end
 
 %% Reading plot
@@ -510,18 +452,8 @@ function myCloseRequestFunction(src, ~)
 end
 
 function arrows = draw_frame(vectors, color, parent)
-    
     arrows = cell(1, 3);
     for i = 1:3
         arrows{i} = quiver3(0, 0, 0, vectors(1, i), vectors(2, i), vectors(3, i), color, 'LineWidth', 2, Parent=parent);
->>>>>>> Stashed changes
     end
-
-    X0 = [rvec(rEci); rvec(vEci); q0(:); 0; 0; 0];
-    opts = odeset('RelTol', 1e-12, 'AbsTol', 1e-12);
-    [t, X] = ode45(@vleo.dynamics.sat_dynamics_nonlinear, ts, X0, opts);
-end
-
-function v = rvec(v)
-    v = reshape(v, [], 1);
 end

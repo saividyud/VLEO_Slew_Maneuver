@@ -8,6 +8,7 @@ function params = default_control_test_params(includeAerodynamics)
     params.radius = 0.5 * norm(params.bodyDims);
     params.J2 = c.J2_earth;
     params.I_CB = vleo.dynamics.cuboid_inertia_matrix(params.mass, params.bodyDims);
+    params.momentArms = [0.3; 0.3; 0.2];
     params.Kp_att = 10;
     params.omega_earth = c.omega_earth;
     params.includeAerodynamics = includeAerodynamics;
