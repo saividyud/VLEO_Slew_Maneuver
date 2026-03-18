@@ -1,0 +1,221 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  pdftitle={Ion Thruster and VLEO Findings}
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\title{Ion Thruster and VLEO Findings\\\large Consolidated Research Note}
+\author{}
+\date{18 March 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Scope}
+
+This note consolidates the earlier research thread into a single cited reference.
+It now covers five questions:
+
+\begin{enumerate}
+    \item What is the maximum thrust produced by ion thrusters?
+    \item What is the lowest altitude at which a spacecraft has orbited Earth?
+    \item What is the minimum specific impulse, $I_{sp}$, of an ion thruster?
+    \item What is a typical specific impulse, $I_{sp}$, for an ion thruster?
+    \item What is the maximum specific impulse, $I_{sp}$, documented for an ion thruster?
+\end{enumerate}
+
+Two terminology caveats matter for interpreting the answers:
+
+\begin{itemize}
+    \item ``Ion thruster'' is used loosely in public discussions. In narrow usage it usually means gridded ion engines; in broader usage it may include Hall thrusters and electrospray or colloid ion thrusters.
+    \item ``Most powerful in space'' can mean either the most powerful \emph{single engine} or the largest \emph{combined spacecraft propulsion system}. Those are not always the same record.
+\end{itemize}
+
+\section{Maximum Thrust from Ion Thrusters}
+
+Table~\ref{tab:thrust} summarizes the best-supported values found in non-Wikipedia sources.
+
+\begin{table}[h!]
+\centering
+\caption{Documented ion-thruster thrust figures}
+\label{tab:thrust}
+\begin{tabular}{p{3.0cm} p{4.2cm} p{2.0cm} p{2.2cm} p{3.1cm}}
+\toprule
+Case & Thruster or system & Status & Thrust & Notes \\
+\midrule
+Ground-test maximum & X3 nested-channel Hall thruster & Ground test & 5.4 N & Demonstrated at 102 kW with 1800--2650 s specific impulse \cite{hall2021,peplx3} \\
+Single ion engine used in space & NEXT-C & Flown & Up to 235 mN & NASA Glenn fact sheet gives a 25--235 mN operating range; Guinness lists NEXT-C as the most powerful ion engine used in space \cite{nextc,nextcgwr} \\
+Combined documented spacecraft ion-propulsion thrust & BepiColombo MTM solar-electric propulsion system & Flown & 290 mN total & ESA states the Mercury Transfer Module provides up to 290 mN total thrust; QinetiQ T6 operating points are 75--145 mN per thruster with up to 4300 s specific impulse \cite{bepifact,esaops,t6eval} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The main conclusions are:
+
+\begin{itemize}
+    \item The largest thrust found for an ion thruster in testing is the X3 Hall thruster at \textbf{5.4 N} \cite{hall2021,peplx3}.
+    \item For a \emph{single flown ion engine}, the strongest documented capability found in the reviewed sources is \textbf{NEXT-C at up to 235 mN} \cite{nextc,nextcgwr}.
+    \item For a \emph{spacecraft system}, ESA documents \textbf{up to 290 mN total} for the BepiColombo Mercury Transfer Module electric-propulsion system \cite{bepifact,esaops}.
+\end{itemize}
+
+So, if the question is about a single flown ion engine, the best documented answer is \textbf{235 mN}. If the question is about the total thrust available from a flown spacecraft ion-propulsion system, the best documented answer found here is \textbf{290 mN}. If the question includes ground-tested hardware, the answer rises to \textbf{5.4 N}.
+
+\section{Lowest Altitude Spacecraft Orbit}
+
+The best-supported answer is JAXA's \textbf{TSUBAME} (SLATS), which set the record for the lowest altitude by an Earth-observation satellite in orbit at \textbf{167.4 km} \cite{jaxavariety,tsubamegwr}.
+
+JAXA's public material identifies TSUBAME as the record-holder at 167.4 km \cite{jaxavariety}. Guinness World Records gives the same altitude and dates the mission from 23 December 2017 to 1 October 2019 \cite{tsubamegwr}. JAXA also explains why this regime is difficult: at 200--300 km altitude the atmospheric drag and atomic-oxygen environment are about 1000 times greater than those experienced by most Earth-observation satellites, which is why TSUBAME required active orbit maintenance with an ion engine and why the mission was treated as a technology demonstrator \cite{jaxaterminate}.
+
+Therefore, the lowest orbital altitude found in the reviewed sources is \textbf{167.4 km}. 
+
+\section{Specific Impulse of Ion Thrusters}
+
+There is no single universal minimum, typical, or maximum without defining the thruster class and whether advanced concepts are included.
+
+Specific impulse is related to effective exhaust velocity by
+
+\begin{equation}
+I_{sp} = \frac{v_e}{g_0}.
+\end{equation}
+
+\subsection{Minimum values}
+
+For \emph{conventional} gridded ion engines, the reviewed NASA sources place operating ranges well above chemical-propulsion values:
+
+\begin{itemize}
+    \item NASA's low-power ion-propulsion work for small spacecraft reports approximately \textbf{2000 to 3000 s} \cite{nasalowpower}.
+    \item NASA reporting on high-power ion thrusters gives approximately \textbf{3000 to 5000 s} \cite{nasahighpower}.
+\end{itemize}
+
+For \emph{electrospray or colloid ion thrusters}, lower values are documented:
+
+\begin{itemize}
+    \item An MIT open-access journal paper reports a miniaturized ionic-liquid electrospray thruster at \textbf{about 760 s}, including all losses, with 11--12.5 $\mu$N thrust \cite{krejci2017}.
+    \item MIT's S-iEPS CubeSat system is reported at \textbf{1200 s} and 100 $\mu$N with less than 1.5 W input power \cite{mitsieps}.
+    \item Busek lists its BET-MAX electrospray system at \textbf{850 to 2300 s} \cite{busek}.
+    \item An IEPC electrospray performance paper reports a much broader capability range of \textbf{100 to 10000 s} \cite{iepc2009electrospray}.
+\end{itemize}
+
+The practical conclusion on the minimum is therefore scope-dependent:
+
+\begin{itemize}
+    \item If ``ion thruster'' means a conventional primary-propulsion ion engine, the minimum practical range in the reviewed sources is roughly \textbf{2000 s}. 
+    \item If electrospray and colloid ion thrusters are included, the lowest clearly documented experimental value found in accessible non-Wikipedia sources is \textbf{about 760 s} \cite{krejci2017}.
+    \item The broader literature reviewed here indicates that electrospray devices can extend lower still, to around \textbf{100 s} in some operating regimes \cite{iepc2009electrospray}, but that value should be interpreted as technology- and mode-dependent rather than as a universal minimum for all ion thrusters.
+\end{itemize}
+
+\subsection{Typical values}
+
+For conventional gridded ion engines, the reviewed non-Wikipedia sources cluster in the low-thousands of seconds:
+
+\begin{itemize}
+    \item NASA's low-power ion-propulsion work for small spacecraft reports approximately \textbf{2000 to 3000 s} \cite{nasalowpower}.
+    \item NASA reporting on high-power ion thrusters gives approximately \textbf{3000 to 5000 s} \cite{nasahighpower}.
+    \item For CubeSat-class hardware, Busek's BIT-3 RF ion thruster product page reports \textbf{up to 2150 s}, and the associated IEPC paper describes a 60 W design point of \textbf{3200 s} \cite{bit3datasheet,bit3paper}.
+\end{itemize}
+
+A practical engineering answer is therefore that a \emph{typical conventional ion thruster} operates at about \textbf{2000 to 4000 s}, with smaller or lower-power systems nearer the lower end and larger or higher-power systems extending toward about 5000 s in the reviewed NASA literature.
+
+\subsection{Maximum values}
+
+For the maximum specific impulse, it is important to distinguish between present conventional hardware and advanced concepts:
+
+\begin{itemize}
+    \item ESA's DS4G overview states that present gridded ion thrusters are practically limited to \textbf{less than 10000 s} because conventional grid systems must keep beam potential around 5 kV to avoid beam divergence, impingement, and sputtering \cite{ds4goverview}.
+    \item The same ESA source gives a projected DS4G operating point of \textbf{19300 s} specific impulse, \textbf{2.5 N} thrust, and \textbf{250 kW} power for a 20 cm xenon thruster using a dual-stage 4-grid arrangement \cite{ds4goverview}.
+\end{itemize}
+
+The best-supported non-Wikipedia maximum found in this review is therefore \textbf{19300 s} for the advanced ESA DS4G concept. For currently conventional ion thrusters in the reviewed NASA sources, a more practical upper-end figure is about \textbf{5000 s}.
+
+\section{Bottom-Line Answers}
+
+Using the strongest non-Wikipedia sources gathered in this review:
+
+\begin{itemize}
+    \item \textbf{Maximum demonstrated ion-thruster thrust (ground test):} 5.4 N for the X3 Hall thruster \cite{hall2021,peplx3}.
+    \item \textbf{Most powerful single ion engine used in space:} NEXT-C, with a documented capability of up to 235 mN \cite{nextc,nextcgwr}.
+    \item \textbf{Largest documented combined spacecraft ion-propulsion thrust in the reviewed sources:} BepiColombo MTM, up to 290 mN total \cite{bepifact,esaops}.
+    \item \textbf{Lowest spacecraft orbital altitude:} TSUBAME (SLATS), 167.4 km \cite{jaxavariety,tsubamegwr}.
+    \item \textbf{Minimum ion-thruster $I_{sp}$:} about 760 s in a documented MIT electrospray microthruster study, or about 2000 s if restricted to conventional gridded ion engines \cite{krejci2017,nasalowpower}.
+    \item \textbf{Typical conventional ion-thruster $I_{sp}$:} about 2000 to 4000 s, with the reviewed NASA range extending to about 5000 s depending on power class \cite{nasalowpower,nasahighpower,bit3datasheet,bit3paper}.
+    \item \textbf{Maximum ion-thruster $I_{sp}$ found in the reviewed non-Wikipedia sources:} 19300 s for ESA's advanced DS4G concept; ESA describes present conventional gridded ion thrusters as practically limited to less than 10000 s \cite{ds4goverview}.
+\end{itemize}
+
+\begin{thebibliography}{99}
+
+\bibitem{hall2021}
+S. J. Hall, B. A. Jorns, S. E. Cusson, A. D. Gallimore, H. Kamhawi, P. Y. Peterson, T. W. Haag, J. A. Mackey, M. J. Baird, and J. H. Gilland, ``Performance and High-Speed Characterization of a 100-kW Nested Hall Thruster,'' \emph{Journal of Propulsion and Power}, 2021. [Online]. Available: \url{https://pepl.engin.umich.edu/pdf/2021_AIAA_Hall.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{peplx3}
+University of Michigan Plasmadynamics and Electric Propulsion Laboratory, ``X3 -- Nested Channel Hall Thruster,'' [Online]. Available: \url{https://pepl.engin.umich.edu/project/x3-nested-channel-hall-thruster/}. [Accessed: Mar. 18, 2026].
+
+\bibitem{nextc}
+NASA Glenn Research Center, ``NASA's Evolutionary Xenon Thruster-Commercial (NEXT-C) NEXT Overview,'' Nov. 1, 2021. [Online]. Available: \url{https://www1.grc.nasa.gov/wp-content/uploads/NEXT-C_FactSheet_11_1_21_rev4.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{nextcgwr}
+Guinness World Records, ``Most powerful ion engine used in space,'' Nov. 24, 2021. [Online]. Available: \url{https://www.guinnessworldrecords.com/world-records/most-powerful-ion-engine-used-in-space}. [Accessed: Mar. 18, 2026].
+
+\bibitem{bepifact}
+European Space Agency, ``BepiColombo Fact Sheet,'' Mar. 30, 2020. [Online]. Available: \url{https://sci.esa.int/web/bepicolombo/-/47346-fact-sheet}. [Accessed: Mar. 18, 2026].
+
+\bibitem{esaops}
+European Space Agency, ``BepiColombo operations,'' Apr. 1, 2015. [Online]. Available: \url{https://www.esa.int/Enabling_Support/Operations/BepiColombo_operations}. [Accessed: Mar. 18, 2026].
+
+\bibitem{t6eval}
+N. Wallace, A. Grubisic, S. Clark, C. Collingwood, and F. Guarducci, ``Performance Evaluation of the T6 Ion Engine,'' AIAA-2010-7114, 2010. [Online]. Available: \url{http://richard.hofer.com/pdf/aiaa-2010-7114.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{jaxavariety}
+Japan Aerospace Exploration Agency, ``A Variety of Satellites,'' JAXA Satellite Navigator. [Online]. Available: \url{https://www.satnavi.jaxa.jp/en/satellite-knowledge/whats-eosatellite/satellite-type/index.html}. [Accessed: Mar. 18, 2026].
+
+\bibitem{tsubamegwr}
+Guinness World Records, ``Lowest altitude by an Earth observation satellite in orbit,'' [Online]. Available: \url{https://www.guinnessworldrecords.com/world-records/592663-lowest-altitude-earth-observation-satellite-in-orbit}. [Accessed: Mar. 18, 2026].
+
+\bibitem{jaxaterminate}
+Japan Aerospace Exploration Agency, ``JAXA terminates the operation of TSUBAME, a Super Low Altitude Test Satellite (SLATS),'' Oct. 2, 2019. [Online]. Available: \url{https://global.jaxa.jp/press/2019/10/20191002a.html}. [Accessed: Mar. 18, 2026].
+
+\bibitem{nasalowpower}
+NASA, ``Low-Power Ion Propulsion for Small Spacecraft,'' NASA TM 113111, 1998. [Online]. Available: \url{https://ntrs.nasa.gov/api/citations/19980017819/downloads/19980017819.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{nasahighpower}
+NASA, ``High Power Ion Thruster Performance,'' 1988. [Online]. Available: \url{https://ntrs.nasa.gov/api/citations/19880003160/downloads/19880003160.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{krejci2017}
+D. Krejci, R. Thomas, T. Haag, F. Mier-Hicks, and P. C. Lozano, ``Emission Characteristics of Passively Fed Electrospray Microthrusters with Propellant Reservoirs,'' \emph{Journal of Spacecraft and Rockets}, vol. 54, no. 2, pp. 447--458, 2017. [Online]. Available: \url{http://hdl.handle.net/1721.1/108538}. [Accessed: Mar. 18, 2026].
+
+\bibitem{mitsieps}
+Massachusetts Institute of Technology Space Propulsion Laboratory, ``MIT SPL delivers the Scalable ion Electrospray Propulsion System (S-iEPS) for CubeSats to NASA,'' Apr. 2016. [Online]. Available: \url{https://spacepropulsion.mit.edu/news/mit-spl-delivers-scalable-ion-electrospray-propulsion-system-s-ieps-cubesats-nasa/}. [Accessed: Mar. 18, 2026].
+
+\bibitem{busek}
+Busek Co. Inc., ``Electrospray Thrusters,'' [Online]. Available: \url{https://www.busek.com/electrospray-thrusters}. [Accessed: Mar. 18, 2026].
+
+\bibitem{iepc2009electrospray}
+``Performance of Electrospray Thrusters,'' IEPC-2009-242, 31st International Electric Propulsion Conference, 2009. [Online]. Available: \url{https://electricrocket.org/IEPC/IEPC-2009-242.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{bit3datasheet}
+Busek Co. Inc., ``BIT-3 RF Ion Thruster,'' [Online]. Available: \url{https://www.busek.com/bit3}. [Accessed: Mar. 18, 2026].
+
+\bibitem{bit3paper}
+J. Dankanich, D. H. Choi, J. Polk, T. Drummond, C. McCaskill, and V. Hruby, ``A Mission-Enabling, Iodine-Fueled Mini RF Ion Thruster for CubeSat Applications,'' IEPC-2015-273 / ISTS-2015-b-273, 2015. [Online]. Available: \url{https://electricrocket.org/IEPC/IEPC-2015-273_ISTS-2015-b-273.pdf}. [Accessed: Mar. 18, 2026].
+
+\bibitem{ds4goverview}
+European Space Agency Advanced Concepts Team, ``Dual-stage Gridded Ion Thruster (DS4G),'' Mar. 3, 2006. [Online]. Available: \url{https://www.esa.int/gsp/ACT/projects/ds4g_overview/}. [Accessed: Mar. 18, 2026].
+
+\end{thebibliography}
+
+\end{document}

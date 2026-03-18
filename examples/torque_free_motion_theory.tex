@@ -1,0 +1,172 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{hyperref}
+
+\title{Theory of Rigid Body Motion\\and Linearized Error Dynamics}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This document outlines the theoretical foundations for the MATLAB script \path{example_torque_free_motion.m}. The script simulates the rotational dynamics of a rigid body (a CubeSat) subject to zero external torques. It propagates a nominal trajectory and compares it against slightly perturbed trajectories using both the full nonlinear equations of motion and a linearized error model. The same framework also extends naturally to the case where an external torque depends on attitude angle.
+
+\section{Nonlinear Equations of Motion}
+The rotational state of the rigid body is defined by its attitude quaternion $q$ (representing the rotation from the inertial frame to the body frame) and its angular velocity $\omega$ expressed in the body frame.
+
+\subsection{Attitude Kinematics}
+We use the scalar-first quaternion convention $q = [q_0; \vec{q}_v]^T$. The kinematic differential equation governing the evolution of the attitude quaternion is:
+\begin{equation}
+    \dot{q} = \frac{1}{2} q \otimes \begin{bmatrix} 0 \\ \omega \end{bmatrix}
+\end{equation}
+where $\otimes$ denotes quaternion multiplication.
+
+\subsection{Rigid Body Dynamics (Euler's Equations)}
+The rotational dynamics of a rigid body are governed by Euler's equation. In the most general case considered here,
+\begin{equation}
+    J \dot{\omega} + \omega \times (J\omega) = \tau_{ext}(q, \omega, t)
+\end{equation}
+where $J$ is the principal moment of inertia matrix of the body and $\tau_{ext}$ is the applied external torque, expressed in the body frame.
+
+For the torque-free script, $\tau_{ext} = 0$, so the equation reduces to:
+\begin{equation}
+    J \dot{\omega} + \omega \times (J\omega) = 0 \quad \implies \quad \dot{\omega} = -J^{-1} (\omega \times (J\omega))
+\end{equation}
+
+If a torque depends on attitude angle, then the nonlinear dynamics simply keep the same structure with a nonzero right-hand side. Typical examples are gravity-gradient torques, magnetic torques, spring-like restoring torques, or control torques generated from an attitude error law.
+
+\section{Attitude Error Representation}
+To study perturbations, we define a nominal trajectory $(q_{nom}(t), \omega_{nom}(t))$ and a perturbed trajectory $(q_{pert}(t), \omega_{pert}(t))$. 
+
+The attitude error between the nominal body frame and the perturbed body frame is represented by the error quaternion $q_{err}$, defined via the multiplicative attitude error:
+\begin{equation}
+    q_{err} = q_{nom}^{-1} \otimes q_{pert}
+\end{equation}
+For small angular deviations, the error quaternion can be approximated as:
+\begin{equation}
+    q_{err} \approx \begin{bmatrix} 1 \\ \frac{1}{2} \delta\theta \end{bmatrix}
+\end{equation}
+where $\delta\theta \in \mathbb{R}^3$ is the small-angle error vector (Euler angles) relating the nominal and perturbed body frames. Therefore, the attitude error vector can be extracted as $\delta\theta \approx 2 \vec{q}_{err, v}$.
+
+The angular rate error is simply defined as the difference between the perturbed and nominal angular rates:
+\begin{equation}
+    \delta\omega = \omega_{pert} - \omega_{nom}
+\end{equation}
+
+\section{Linearized Error Dynamics}
+To analyze stability and design linear controllers, we linearize the nonlinear kinematics and dynamics about the time-varying nominal trajectory $(\omega_{nom}(t))$. 
+
+\subsection{Linearized Kinematics}
+Taking the derivative of the attitude error vector $\delta\theta$ expressed in the rotating nominal body frame yields an extra Coriolis-like term:
+\begin{equation}
+    \delta\dot{\theta} = \delta\omega - \omega_{nom} \times \delta\theta
+\end{equation}
+This term accounts for the relative rotation of the reference frame in which the attitude error is measured.
+
+\subsection{Linearized Dynamics}
+For the torque-free case, we substitute $\omega = \omega_{nom} + \delta\omega$ into Euler's equation:
+\begin{equation}
+    J (\dot{\omega}_{nom} + \delta\dot{\omega}) = -(\omega_{nom} + \delta\omega) \times J(\omega_{nom} + \delta\omega)
+\end{equation}
+Expanding the cross products and noting that $J\dot{\omega}_{nom} = -\omega_{nom} \times J\omega_{nom}$:
+\begin{equation}
+    J\delta\dot{\omega} \approx - \delta\omega \times (J\omega_{nom}) - \omega_{nom} \times (J\delta\omega)
+\end{equation}
+where we have dropped the second-order term $\delta\omega \times (J\delta\omega)$.
+Using the anti-commutative property of the cross product ($a \times b = -b \times a$), we can rewrite $-\delta\omega \times (J\omega_{nom})$ as $(J\omega_{nom}) \times \delta\omega$. This yields the linearized dynamics implemented in the script:
+\begin{equation}
+    \delta\dot{\omega} = J^{-1} \Big[ (J\omega_{nom}) \times \delta\omega - \omega_{nom} \times (J\delta\omega) \Big]
+\end{equation}
+Using the skew-symmetric matrix operator $[\cdot]^\times$, this can be written as:
+\begin{equation}
+    \delta\dot{\omega} = J^{-1} \Big[ [J\omega_{nom}]^\times \delta\omega - [\omega_{nom}]^\times J \delta\omega \Big]
+\end{equation}
+
+\subsection{If the Torque Depends on Angle}
+Now suppose the external torque depends on attitude, or more generally on attitude, rate, and time:
+\begin{equation}
+    J \dot{\omega} + \omega \times (J\omega) = \tau_{ext}(q, \omega, t)
+\end{equation}
+Let the nominal trajectory satisfy
+\begin{equation}
+    J \dot{\omega}_{nom} + \omega_{nom} \times (J\omega_{nom}) = \tau_{nom}
+\end{equation}
+with $\tau_{nom} = \tau_{ext}(q_{nom}, \omega_{nom}, t)$. Linearizing the torque term gives
+\begin{equation}
+    \delta\tau \approx K_{\theta}(t) \, \delta\theta + K_{\omega}(t) \, \delta\omega
+\end{equation}
+where the Jacobian matrices are local sensitivity matrices of torque with respect to attitude error and rate error along the nominal trajectory.
+
+The linearized rotational dynamics become
+\begin{equation}
+    J\delta\dot{\omega} = [J\omega_{nom}]^\times \delta\omega - [\omega_{nom}]^\times J \delta\omega + \delta\tau
+\end{equation}
+or, after substituting the local torque model,
+\begin{equation}
+    \delta\dot{\omega} = J^{-1} \Big( [J\omega_{nom}]^\times \delta\omega - [\omega_{nom}]^\times J \delta\omega + K_{\theta} \, \delta\theta + K_{\omega} \, \delta\omega \Big)
+\end{equation}
+while the kinematics remain
+\begin{equation}
+    \delta\dot{\theta} = \delta\omega - \omega_{nom} \times \delta\theta
+\end{equation}
+
+Therefore, an angle-dependent torque appears in the linearized model as an additional stiffness-like term $K_{\theta} \, \delta\theta$.
+
+\subsection{Important Special Case: Restoring Torque}
+If the nominal motion is an equilibrium with $\omega_{nom} = 0$ and the torque is a restoring torque near that equilibrium, then a common local model is
+\begin{equation}
+    \tau_{ext}(\theta) \approx -K \, \delta\theta
+\end{equation}
+where $K$ is an attitude stiffness matrix. The linearized equations reduce to
+\begin{align}
+    \delta\dot{\theta} &= \delta\omega \\
+    J\delta\dot{\omega} &= -K \, \delta\theta
+\end{align}
+Combining the two gives the familiar second-order small-angle system
+\begin{equation}
+    J \delta\ddot{\theta} + K \, \delta\theta = 0
+\end{equation}
+which is the rotational analog of a mass-spring oscillator.
+
+If damping or active rate feedback is present, for example $\tau_{ext} \approx -K \, \delta\theta - C \, \delta\omega$, then
+\begin{equation}
+    J \delta\ddot{\theta} + C \, \delta\dot{\theta} + K \, \delta\theta = 0
+\end{equation}
+which is the rotational analog of a damped mass-spring system.
+
+\subsection{Nonlinear Angle-Dependent Torques}
+If the exact torque is nonlinear in angle, for example
+\begin{equation}
+    \tau_{ext}(\theta) = -k \sin \theta
+\end{equation}
+then the full nonlinear propagation must retain that exact torque law. The small-angle linearization replaces $\sin \theta$ with $\theta$, giving
+\begin{equation}
+    \tau_{ext}(\theta) \approx -k\theta
+\end{equation}
+which is accurate only while the attitude error remains small.
+
+\section{Conservation Laws}
+In the absence of external torques, two key quantities remain strictly conserved throughout the motion:
+\begin{enumerate}
+    \item \textbf{Angular Momentum:} The angular momentum vector $\vec{H} = J\omega$ is constant in the inertial frame. Consequently, its magnitude in the body frame, $\|\vec{H}\| = \|J\omega\|$, remains constant.
+    \item \textbf{Rotational Kinetic Energy:} The rotational kinetic energy $T_{rot} = \frac{1}{2} \omega^T J \omega$ is constant.
+\end{enumerate}
+The script verifies the numerical accuracy of the propagation by checking the drift of these two conserved quantities over time.
+
+With a nonzero external torque, these conservation laws change:
+\begin{itemize}
+    \item Angular momentum is generally no longer constant, because the external torque changes it according to $\dot{\vec{H}} = \tau_{ext}$ in the inertial frame.
+    \item Rotational kinetic energy is generally no longer constant either, because the torque can do work on the body.
+    \item If the torque is conservative and derives from a potential $U(\theta)$, then total mechanical energy,
+    \begin{equation}
+        E = \frac{1}{2} \omega^T J \omega + U(\theta)
+    \end{equation}
+    is conserved in the absence of damping and explicit time dependence.
+\end{itemize}
+
+So, for the current script, $\tau_{ext} = 0$ and the motion is torque-free. If you add a torque that depends on angle, the nonlinear dynamics gain a forcing term and the linearized error model gains the additional stiffness-like contribution described above.
+
+\end{document}

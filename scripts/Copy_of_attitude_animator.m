@@ -52,13 +52,8 @@ beta_i = QfromDCM(R_BI_i)'; % Initial quaternion
 % Zero initial angular spin
 omega_i = [0, 0, 0]; % Initial angular rate
 
-<<<<<<< Updated upstream
-X_i = [r_i, v_i, beta_i, omega_i]';
-Xr = [1; 0; 0; 0; 0; 0; 0];% Reference: identity quaternion, zero angular rate
-=======
 X_i = [r_i, v_i, beta_i, omega_i, zeros(1,4)]';
-Xr = [ 1, 0 , 0, 0, 0, 0, 0]';
->>>>>>> Stashed changes
+Xr = [1; 0; 0; 0; 0; 0; 0]; % Reference: identity quaternion, zero angular rate
 %% Simulating
 % Simualation bounds
 t0 = 0;

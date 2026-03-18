@@ -9,11 +9,25 @@ function tauAero = evaluate_aero_torque(t, X, rEciToBody, params)
 
     vBody = rEciToBody * vEci;
     if norm(vBody) > 1
-        attitude.aoa = atan2d(vBody(3), vBody(1));
-        attitude.aos = atan2d(vBody(2), vBody(1));
+        % Compute unit vector in wind frame (vBody direction)
+        % +X_wind is aligned with the spacecraft velocity vector relative to the air
+        u_vel_body = vBody / norm(vBody);
+        wind_X = u_vel_body;
+        
+        % Construct a wind frame
+        % Default +Z wind is loosely +Z body, but orthogonalized
+        if abs(wind_X(3)) < 0.99
+            wind_Y = cross(wind_X, [0; 0; 1]);
+        else
+            wind_Y = cross(wind_X, [1; 0; 0]);
+        end
+        wind_Y = wind_Y / norm(wind_Y);
+        wind_Z = cross(wind_X, wind_Y);
+        
+        R_body2wind = [wind_X, wind_Y, wind_Z]'; % DCM from body to wind
+        attitude.quaternion = dcm2quat(R_body2wind)'; % [q0; q1; q2; q3]
     else
-        attitude.aoa = 0;
-        attitude.aos = 0;
+        attitude.quaternion = [1; 0; 0; 0];
     end
 
     location.positionECI = rEci;
