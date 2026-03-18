@@ -1,4 +1,4 @@
-function Xd = Sat_template_linearized_augmented(t, X, Xr)
+function Xd = sat_dynamics_linearized_augmented(t, X, Xr)
     %#ok<INUSD>
     Xd = zeros(17, 1);
 
