@@ -132,58 +132,140 @@ if t_end_visible <= scenario.t_eruption
 end
 
 t_match_default = scenario.t_eruption + 0.75 * (t_end_visible - scenario.t_eruption);
-if isempty(targetMatchTime)
-    t_match_request = t_match_default;
-    matchSourceText = 'default 3/4 visibility rule';
-else
-    t_match_request = double(targetMatchTime);
-    matchSourceText = 'user override';
-end
-
-if t_match_request <= scenario.t_eruption || t_match_request >= t_end_visible
-    error('control_test4:MatchTimeOutOfRange', ...
-        'targetMatchTime must be strictly between eruption time and end-visible time.');
-end
-
-[~, idx_match] = min(abs(tspan - t_match_request));
-t_match = tspan(idx_match);
-if idx_match <= idx_eruption || idx_match >= idx_end_visible
-    error('control_test4:SnappedMatchTimeOutOfRange', ...
-        'The requested match time snaps outside the valid post-eruption visible interval.');
-end
-
-fprintf('Requested match time (%s): %.2f s\n', matchSourceText, t_match_request);
-fprintf('Using sampled match time: %.2f s (%.2f min)\n', t_match, t_match / 60);
-fprintf('Maneuver duration after eruption: %.2f s\n\n', t_match - scenario.t_eruption);
-
 X_eruption = X_orbit_history(idx_eruption, :)';
 q_initial = X_eruption(7:10) / norm(X_eruption(7:10));
 omega_initial_body = X_eruption(11:13);
+usedFallbackMatchScan = false;
 
-q_target = trackingHistory.q_track_history(idx_match, :)';
-q_target = q_target / norm(q_target);
-if dot(q_initial, q_target) < 0
-    q_target = -q_target;
+if isempty(targetMatchTime)
+    t_match_request = t_match_default;
+    [~, idx_match_default] = min(abs(tspan - t_match_request));
+    t_match_default_sampled = tspan(idx_match_default);
+    if idx_match_default <= idx_eruption || idx_match_default >= idx_end_visible
+        error('control_test4:SnappedMatchTimeOutOfRange', ...
+            'The default match time snaps outside the valid post-eruption visible interval.');
+    end
+
+    q_target_default = trackingHistory.q_track_history(idx_match_default, :)';
+    q_target_default = q_target_default / norm(q_target_default);
+    if dot(q_initial, q_target_default) < 0
+        q_target_default = -q_target_default;
+    end
+    omega_target_body_default = trackingHistory.omega_track_body_history(idx_match_default, :)';
+
+    n_opt_intervals = 20;
+    fprintf('Solving fast rotational slew with %d output intervals...\n', n_opt_intervals);
+    fprintf('Using an analytic warm start with nonlinear direct-shooting refinement.\n');
+    opt_result_default = vleo.control.solve_minimax_attitude_slew_fast_legacy(q_initial, omega_initial_body, q_target_default, ...
+        omega_target_body_default, params.I_CB, t_match_default_sampled - scenario.t_eruption, n_opt_intervals, ...
+        'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20], ...
+        'momentArms', params.momentArms);
+
+    if is_match_result_feasible(opt_result_default)
+        idx_match = idx_match_default;
+        t_match = t_match_default_sampled;
+        q_target = q_target_default;
+        omega_target_body = omega_target_body_default;
+        opt_result = opt_result_default;
+        matchSourceText = 'default 3/4 visibility rule';
+
+        matchSelection = struct();
+        matchSelection.candidateTimes = t_match;
+        matchSelection.gammaHistory_N = opt_result.gammaForceEquivalent;
+        matchSelection.angleErrorDegHistory = opt_result.terminalAngleErrorDeg;
+        matchSelection.rateErrorDegPerSecHistory = opt_result.terminalRateErrorDegPerSec;
+        matchSelection.isFeasibleHistory = true;
+        matchSelection.selectedTime = t_match;
+        matchSelection.defaultTime = t_match_request;
+        matchSelection.defaultSampledTime = t_match;
+        matchSelection.selectionText = matchSourceText;
+    else
+        usedFallbackMatchScan = true;
+        fprintf(['Default handoff at %.2f s was not solver-feasible ', ...
+            '(attitude error %.3e deg, rate error %.3e deg/s).\n'], ...
+            t_match_default_sampled, opt_result_default.terminalAngleErrorDeg, ...
+            opt_result_default.terminalRateErrorDegPerSec);
+        fprintf('Scanning nearby candidate handoff times to recover a robust solution...\n');
+
+        matchSelection = select_robust_match_time(tspan, idx_eruption, idx_end_visible, ...
+            trackingHistory, q_initial, omega_initial_body, params.I_CB, params.momentArms, t_match_default);
+        idx_match = matchSelection.idxSelected;
+        t_match = matchSelection.selectedTime;
+        q_target = matchSelection.qTarget;
+        omega_target_body = matchSelection.omegaTargetBody;
+        opt_result = matchSelection.resultSelected;
+        matchSourceText = matchSelection.selectionText;
+    end
+else
+    t_match_request = double(targetMatchTime);
+    matchSourceText = 'user override';
+
+    if t_match_request <= scenario.t_eruption || t_match_request >= t_end_visible
+        error('control_test4:MatchTimeOutOfRange', ...
+            'targetMatchTime must be strictly between eruption time and end-visible time.');
+    end
+
+    [~, idx_match] = min(abs(tspan - t_match_request));
+    t_match = tspan(idx_match);
+    if idx_match <= idx_eruption || idx_match >= idx_end_visible
+        error('control_test4:SnappedMatchTimeOutOfRange', ...
+            'The requested match time snaps outside the valid post-eruption visible interval.');
+    end
+
+    q_target = trackingHistory.q_track_history(idx_match, :)';
+    q_target = q_target / norm(q_target);
+    if dot(q_initial, q_target) < 0
+        q_target = -q_target;
+    end
+    omega_target_body = trackingHistory.omega_track_body_history(idx_match, :)';
+
+    n_opt_intervals = 20;
+    fprintf('Solving fast rotational slew with %d output intervals...\n', n_opt_intervals);
+    fprintf('Using an analytic warm start with nonlinear direct-shooting refinement.\n');
+    opt_result = vleo.control.solve_minimax_attitude_slew_fast_legacy(q_initial, omega_initial_body, q_target, ...
+        omega_target_body, params.I_CB, t_match - scenario.t_eruption, n_opt_intervals, ...
+        'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20], ...
+        'momentArms', params.momentArms);
+
+    matchSelection = struct();
+    matchSelection.candidateTimes = t_match;
+    matchSelection.gammaHistory_N = opt_result.gammaForceEquivalent;
+    matchSelection.angleErrorDegHistory = opt_result.terminalAngleErrorDeg;
+    matchSelection.rateErrorDegPerSecHistory = opt_result.terminalRateErrorDegPerSec;
+    matchSelection.isFeasibleHistory = is_match_result_feasible(opt_result);
+    matchSelection.selectedTime = t_match;
+    matchSelection.defaultTime = t_match_request;
+    matchSelection.defaultSampledTime = t_match;
+    matchSelection.selectionText = matchSourceText;
 end
-omega_target_body = trackingHistory.omega_track_body_history(idx_match, :)';
+
+if usedFallbackMatchScan
+    fprintf('Requested match time (default 3/4 visibility rule): %.2f s\n', t_match_request);
+    fprintf('Auto-selection mode: %s\n', matchSourceText);
+else
+    fprintf('Requested match time (%s): %.2f s\n', matchSourceText, t_match_request);
+end
+fprintf('Using sampled match time: %.2f s (%.2f min)\n', t_match, t_match / 60);
+fprintf('Maneuver duration after eruption: %.2f s\n\n', t_match - scenario.t_eruption);
+
+matchScanFigureData = matchSelection;
+if isempty(targetMatchTime) && isscalar(matchSelection.candidateTimes)
+    fprintf('Evaluating nearby match-time scan for plotting...\n');
+    matchScanFigureData = select_robust_match_time(tspan, idx_eruption, idx_end_visible, ...
+        trackingHistory, q_initial, omega_initial_body, params.I_CB, params.momentArms, t_match_default);
+end
 
 fprintf('Target tracking state at t_match:\n');
 fprintf('  Target camera RA/Dec: [%.3f, %.3f] deg\n', ...
     ra_TOO_history(idx_match), dec_TOO_history(idx_match));
 fprintf('  Target body-rate magnitude: %.3e rad/s\n\n', norm(omega_target_body));
 
-n_opt_intervals = 20;
-fprintf('Solving fast rotational slew with %d output intervals...\n', n_opt_intervals);
-fprintf('Using an analytic warm start with nonlinear direct-shooting refinement.\n');
-opt_result = vleo.control.solve_minimax_attitude_slew_fast(q_initial, omega_initial_body, q_target, ...
-    omega_target_body, params.I_CB, t_match - scenario.t_eruption, n_opt_intervals, ...
-    'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20], ...
-    'momentArms', params.momentArms);
-
 fprintf('Slew solver: %s\n', opt_result.solverUsed);
+fprintf('Slew objective mode: %s\n', opt_result.objectiveMode);
 fprintf('Optimization exit flag: %d\n', opt_result.exitflag);
 fprintf('Optimization message: %s\n', opt_result.message);
-fprintf('Peak component force gamma: %.3e N\n', opt_result.gamma);
+fprintf('Peak component torque gamma: %.3e N m\n', opt_result.gammaTorqueEquivalent);
+fprintf('Peak equivalent force gamma: %.3e N\n', opt_result.gammaForceEquivalent);
 fprintf('Peak axis forces [N]: [%.3e, %.3e, %.3e]\n', opt_result.peakAxisForceAbs);
 fprintf('Moment arms [m]: [%.2f, %.2f, %.2f]\n', params.momentArms);
 fprintf('Grid max |tau_i|: %.3e N m\n', opt_result.maxTorqueNodeComponentAbs);
@@ -294,7 +376,8 @@ fprintf('Post-match max RA/Dec error: [%.3e, %.3e] deg\n', max(abs(ra_error)), m
 fprintf('Post-match max body-rate tracking error: %.3e deg/s\n', max(body_rate_tracking_error_deg_s));
 fprintf('Max ||tau_total||_2   = %.3e N m\n', max(vecnorm(tau_total_history, 2, 2)));
 fprintf('Max ||tau_control||_2 = %.3e N m\n', max(vecnorm(tau_control_history, 2, 2)));
-fprintf('Max ||tau_aero||_2    = %.3e N m\n\n', max(vecnorm(tau_aero_history, 2, 2)));
+fprintf('Max ||tau_aero||_2    = %.3e N m\n', max(vecnorm(tau_aero_history, 2, 2)));
+fprintf('Max required actuator force = %.3e N\n\n', max(max(abs(tau_control_history) ./ params.momentArms')));
 
 simulations_dir = vleo.util.simulations_dir();
 anim_data_file = fullfile(simulations_dir, sprintf('control_test4_anim_data_aero_%s_seed_%s.mat', ...
@@ -333,11 +416,84 @@ if generateVisuals
     guiResults.totalTorques = tau_total_history(animationIndices, :);
     guiResults.eulerDeg = plotActualEulerDeg(animationIndices, :);
 
-    fprintf('Generating GUI-compatible animated results plot...\n');
-    vleo.viz.animate_results(struct('results', guiResults));
+    if usejava('desktop')
+        fprintf('Generating GUI-compatible animated results plot...\n');
+        vleo.viz.animate_results(struct('results', guiResults));
+    else
+        fprintf('Skipping GUI animation because MATLAB desktop is unavailable.\n');
+    end
+
+    if ~isempty(idx_start_visible)
+        visibleIndices = idx_start_visible:idx_end_visible;
+    else
+        visibleIndices = 1:idx_end_visible;
+    end
+    actuatorForceHistory_mN = 1e3 * abs(tau_control_history) ./ params.momentArms';
+    peakAxisForceHistory_mN = max(actuatorForceHistory_mN, [], 2);
+    peakForceVisible_mN = max(peakAxisForceHistory_mN(visibleIndices));
+    forceMarginPercent = 100 * peakForceVisible_mN / 145;
+
+    if usedFallbackMatchScan
+        fprintf(['Default handoff needed a local fallback search; the exported scan now ', ...
+            'documents the selected robust match time.\n']);
+    end
+
+    if ~isscalar(matchScanFigureData.candidateTimes)
+        fprintf('Evaluating aerodynamic-aware match-time scan...\n');
+        matchScanFigureData = evaluate_match_time_scan_with_aero(matchScanFigureData, ...
+            tspan, idx_start_visible, idx_eruption, idx_end_visible, X_orbit_history, X_eruption, ...
+            trackingHistory, params, odeOpts);
+
+        fprintf('Generating handoff-time scan figure...\n');
+        candidateTimesMin = matchScanFigureData.candidateTimes(:) / 60;
+        candidatePeakForceWithAero_mN = 1e3 * matchScanFigureData.peakActuatorForceWithAero_N(:);
+        candidatePeakForceManeuverOnly_mN = 1e3 * matchScanFigureData.gammaHistory_N(:);
+        feasibleMask = matchScanFigureData.isFeasibleHistory(:);
+        selectedMask = abs(matchScanFigureData.candidateTimes(:) - t_match) < 1e-12;
+        defaultMask = abs(matchScanFigureData.candidateTimes(:) - matchScanFigureData.defaultSampledTime) < 1e-12;
+
+        figure('Name', 'TOO Handoff Time Scan', 'Color', 'w', 'Position', [120 120 1080 620]);
+        axScan = axes();
+        plot(axScan, candidateTimesMin, candidatePeakForceWithAero_mN, 'k-', ...
+            'LineWidth', 2.0, 'DisplayName', 'Peak force with aero');
+        hold(axScan, 'on');
+        plot(axScan, candidateTimesMin, candidatePeakForceManeuverOnly_mN, '--', ...
+            'Color', [0.55 0.55 0.55], 'LineWidth', 1.3, 'DisplayName', 'Maneuver-only peak force');
+        hold(axScan, 'on');
+        scatter(axScan, candidateTimesMin(feasibleMask), candidatePeakForceWithAero_mN(feasibleMask), 40, ...
+            [0.10 0.55 0.25], 'filled', 'DisplayName', 'Feasible handoff');
+        scatter(axScan, candidateTimesMin(~feasibleMask), candidatePeakForceWithAero_mN(~feasibleMask), 55, ...
+            [0.85 0.22 0.18], 'x', 'LineWidth', 1.6, 'DisplayName', 'Infeasible handoff');
+        if any(defaultMask)
+            scatter(axScan, candidateTimesMin(defaultMask), candidatePeakForceWithAero_mN(defaultMask), 85, ...
+                [0.15 0.42 0.78], 'd', 'filled', 'DisplayName', 'Default match time');
+        end
+        scatter(axScan, candidateTimesMin(selectedMask), candidatePeakForceWithAero_mN(selectedMask), 110, ...
+            'k', 'p', 'filled', 'DisplayName', 'Selected match time');
+        grid(axScan, 'on');
+        xlabel(axScan, 'Match time after event (minutes)', 'FontSize', 15);
+        ylabel(axScan, 'Peak actuator force equivalent (mN)', 'FontSize', 15);
+        title(axScan, 'Robust handoff-time scan including aerodynamic compensation', 'FontSize', 17);
+        legend(axScan, 'Location', 'northwest', 'FontSize', 12);
+        set(axScan, 'FontSize', 12, 'LineWidth', 1.0, 'YScale', 'log');
+        text(axScan, 0.59, 0.88, sprintf([ ...
+            'Selected match: %.2f min\n', ...
+            'Peak with aero = %.3f mN\n', ...
+            'Maneuver only = %.3f mN'], ...
+            t_match / 60, matchScanFigureData.peakActuatorForceWithAeroSelected_N * 1e3, ...
+            opt_result.gammaForceEquivalent * 1e3), ...
+            'Units', 'normalized', 'FontSize', 11, 'BackgroundColor', 'w', 'Margin', 6);
+
+        scanStem = sprintf('too_minimax_handoff_scan_seed_%s_aero_%s', ...
+            scenarioSeedText, vleo.util.on_off_text(params.includeAerodynamics));
+        scanExport = vleo.util.export_paper_figure(gcf, scanStem);
+        fprintf('Paper figure saved to: %s\n', scanExport.pngPath);
+        fprintf('Paper figure saved to: %s\n', scanExport.pdfPath);
+    end
 
     fprintf('Generating attitude summary plots...\n');
-    figure('Name', 'Euler Angle Tracking', 'WindowStyle', 'normal', 'Position', [120 120 1500 650]);
+    figure('Name', 'Euler Angle Tracking', 'WindowStyle', 'normal', 'Color', 'w', ...
+        'Position', [120 120 1500 650]);
     axEuler = axes();
     l1 = plot(axEuler, plotTime / 60, plotDesiredEulerDeg(:, 1), 'r-', 'LineWidth', 2); hold(axEuler, 'on');
     l2 = plot(axEuler, plotTime / 60, plotActualEulerDeg(:, 1), 'r--', 'LineWidth', 2);
@@ -354,8 +510,15 @@ if generateVisuals
         'Location', 'best', 'FontSize', 13, 'AutoUpdate', 'off');
     mark_phase_lines(axEuler, t_start_visible, scenario.t_eruption, t_match, t_end_visible, 13);
     vleo.util.set_visible_domain(axEuler, t_start_visible, t_end_visible);
+    set(axEuler, 'FontSize', 12, 'LineWidth', 1.0);
+    eulerStem = sprintf('too_minimax_euler_tracking_seed_%s_aero_%s', ...
+        scenarioSeedText, vleo.util.on_off_text(params.includeAerodynamics));
+    eulerExport = vleo.util.export_paper_figure(gcf, eulerStem);
+    fprintf('Paper figure saved to: %s\n', eulerExport.pngPath);
+    fprintf('Paper figure saved to: %s\n', eulerExport.pdfPath);
 
-    figure('Name', 'Body Rate Tracking', 'WindowStyle', 'normal', 'Position', [140 140 1500 650]);
+    figure('Name', 'Body Rate Tracking', 'WindowStyle', 'normal', 'Color', 'w', ...
+        'Position', [140 140 1500 650]);
     axRates = axes();
     r1 = plot(axRates, plotTime / 60, rad2deg(omega_body_desired_history(:, 1)), 'r-', 'LineWidth', 2); hold(axRates, 'on');
     r2 = plot(axRates, plotTime / 60, rad2deg(omega_body_actual_history(:, 1)), 'r--', 'LineWidth', 2);
@@ -372,10 +535,16 @@ if generateVisuals
         'Location', 'best', 'FontSize', 13, 'AutoUpdate', 'off');
     mark_phase_lines(axRates, t_start_visible, scenario.t_eruption, t_match, t_end_visible, 13);
     vleo.util.set_visible_domain(axRates, t_start_visible, t_end_visible);
+    set(axRates, 'FontSize', 12, 'LineWidth', 1.0);
+    ratesStem = sprintf('too_minimax_body_rate_tracking_seed_%s_aero_%s', ...
+        scenarioSeedText, vleo.util.on_off_text(params.includeAerodynamics));
+    ratesExport = vleo.util.export_paper_figure(gcf, ratesStem);
+    fprintf('Paper figure saved to: %s\n', ratesExport.pngPath);
+    fprintf('Paper figure saved to: %s\n', ratesExport.pdfPath);
 
     fprintf('Generating torque breakdown plots...\n');
     figure('Name', sprintf('Tracking Torque Breakdown (%s)', vleo.util.on_off_text(params.includeAerodynamics)), ...
-        'WindowStyle', 'normal', 'Position', [160 160 1450 900]);
+        'WindowStyle', 'normal', 'Color', 'w', 'Position', [160 160 1450 900]);
     torqueLayout = tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
     axisLabels = {'x', 'y', 'z'};
 
@@ -389,16 +558,26 @@ if generateVisuals
         title(ax, sprintf('Body-%s Torque Component', upper(axisLabels{axisIdx})), 'FontSize', 17);
         mark_phase_lines(ax, t_start_visible, scenario.t_eruption, t_match, t_end_visible, 13);
         vleo.util.set_visible_domain(ax, t_start_visible, t_end_visible);
+        set(ax, 'FontSize', 12, 'LineWidth', 1.0);
         if axisIdx == 1
             legend(ax, {'Total required', 'Actuator required', 'Aerodynamic disturbance'}, ...
                 'Location', 'best', 'FontSize', 13, 'AutoUpdate', 'off');
+            text(ax, 0.68, 0.86, sprintf('Peak actuator force = %.3f mN\n(%.3f%% of 145 mN budget)', ...
+                peakForceVisible_mN, forceMarginPercent), ...
+                'Units', 'normalized', 'FontSize', 11, 'BackgroundColor', 'w', 'Margin', 6);
         end
     end
     xlabel(torqueLayout, 'Time (minutes)', 'FontSize', 16);
     title(torqueLayout, sprintf('Torque Breakdown with Aerodynamics %s', upper(vleo.util.on_off_text(params.includeAerodynamics))), ...
         'FontSize', 18);
+    torqueStem = sprintf('too_minimax_torque_breakdown_seed_%s_aero_%s', ...
+        scenarioSeedText, vleo.util.on_off_text(params.includeAerodynamics));
+    torqueExport = vleo.util.export_paper_figure(gcf, torqueStem);
+    fprintf('Paper figure saved to: %s\n', torqueExport.pngPath);
+    fprintf('Paper figure saved to: %s\n', torqueExport.pdfPath);
 
-    figure('Name', 'Post-Match Tracking Error', 'WindowStyle', 'normal', 'Position', [180 180 1250 600]);
+    figure('Name', 'Post-Match Tracking Error', 'WindowStyle', 'normal', 'Color', 'w', ...
+        'Position', [180 180 1250 600]);
     plot(tspan(tracking_indices) / 60, pointing_error_deg_history(tracking_indices), 'k-', 'LineWidth', 2); hold on;
     plot(tspan(tracking_indices) / 60, body_rate_tracking_error_deg_s, 'm--', 'LineWidth', 2);
     xlabel('Time (minutes)', 'FontSize', 18);
@@ -407,6 +586,12 @@ if generateVisuals
     legend('Pointing error (deg)', 'Body-rate error (deg/s)', 'Location', 'best', 'FontSize', 14);
     grid on;
     xlim([tspan(tracking_indices(1)) / 60, tspan(tracking_indices(end)) / 60]);
+    set(gca, 'FontSize', 12, 'LineWidth', 1.0);
+    postMatchStem = sprintf('too_minimax_post_match_error_seed_%s_aero_%s', ...
+        scenarioSeedText, vleo.util.on_off_text(params.includeAerodynamics));
+    postMatchExport = vleo.util.export_paper_figure(gcf, postMatchStem);
+    fprintf('Paper figure saved to: %s\n', postMatchExport.pngPath);
+    fprintf('Paper figure saved to: %s\n', postMatchExport.pdfPath);
 else
     fprintf('Skipping GUI animation and figure generation (generateVisuals=false).\n');
 end
@@ -437,4 +622,160 @@ function tauBody = interpolate_maneuver_then_tracking_torque(t, maneuverTimeNode
     end
 
     tauBody = interp1(trackingTimes, trackingTauHistory, t, trackingInterpMethod, 'extrap')';
+end
+
+function selection = select_robust_match_time(tspan, idxEruption, idxEndVisible, trackingHistory, ...
+        qInitial, omegaInitialBody, inertiaBody, momentArms, tMatchDefault)
+    dt = max(eps, abs(tspan(2) - tspan(1)));
+    candidateBufferSec = 5;
+    candidateStepSec = 5;
+    candidateBufferSteps = max(1, round(candidateBufferSec / dt));
+    candidateStep = max(1, round(candidateStepSec / dt));
+    [~, idxDefault] = min(abs(tspan - tMatchDefault));
+
+    idxStart = min(idxEndVisible - 1, idxEruption + candidateBufferSteps);
+    idxCandidates = idxStart:candidateStep:(idxEndVisible - candidateBufferSteps);
+    idxCandidates = unique([idxCandidates, idxDefault]);
+    idxCandidates = idxCandidates(idxCandidates > idxEruption & idxCandidates < idxEndVisible);
+
+    nCandidates = numel(idxCandidates);
+    gammaHistory_N = nan(nCandidates, 1);
+    angleErrorDegHistory = inf(nCandidates, 1);
+    rateErrorDegPerSecHistory = inf(nCandidates, 1);
+    isFeasibleHistory = false(nCandidates, 1);
+    qTargets = zeros(4, nCandidates);
+    omegaTargets = zeros(3, nCandidates);
+    results = cell(nCandidates, 1);
+
+    for candidateIdx = 1:nCandidates
+        idxMatch = idxCandidates(candidateIdx);
+        qTarget = trackingHistory.q_track_history(idxMatch, :)';
+        qTarget = qTarget / norm(qTarget);
+        if dot(qInitial, qTarget) < 0
+            qTarget = -qTarget;
+        end
+        omegaTargetBody = trackingHistory.omega_track_body_history(idxMatch, :)';
+
+        result = vleo.control.solve_minimax_attitude_slew_fast_legacy(qInitial, omegaInitialBody, qTarget, ...
+            omegaTargetBody, inertiaBody, tspan(idxMatch) - tspan(idxEruption), 20, ...
+            'refineNonlinear', true, 'nRefinementIntervals', [12, 16, 20], ...
+            'momentArms', momentArms);
+
+        qTargets(:, candidateIdx) = qTarget;
+        omegaTargets(:, candidateIdx) = omegaTargetBody;
+        results{candidateIdx} = result;
+        gammaHistory_N(candidateIdx) = result.gammaForceEquivalent;
+        angleErrorDegHistory(candidateIdx) = result.terminalAngleErrorDeg;
+        rateErrorDegPerSecHistory(candidateIdx) = result.terminalRateErrorDegPerSec;
+        isFeasibleHistory(candidateIdx) = is_match_result_feasible(result);
+    end
+
+    feasibleCandidates = find(isFeasibleHistory);
+    if any(idxCandidates(feasibleCandidates) == idxDefault)
+        selectedCandidateIdx = find(idxCandidates == idxDefault, 1, 'first');
+        selectionText = 'default 3/4 visibility rule';
+    elseif ~isempty(feasibleCandidates)
+        feasibleTimes = tspan(idxCandidates(feasibleCandidates));
+        sortTable = [abs(feasibleTimes(:) - tMatchDefault), gammaHistory_N(feasibleCandidates)];
+        [~, order] = sortrows(sortTable, [1, 2]);
+        selectedCandidateIdx = feasibleCandidates(order(1));
+        selectionText = 'auto-selected near default 3/4 visibility rule';
+    else
+        penalty = angleErrorDegHistory + rateErrorDegPerSecHistory;
+        [~, selectedCandidateIdx] = min(penalty);
+        selectionText = 'fallback lowest-error handoff candidate';
+    end
+
+    selection = struct();
+    selection.idxCandidates = idxCandidates;
+    selection.candidateTimes = tspan(idxCandidates);
+    selection.gammaHistory_N = gammaHistory_N;
+    selection.angleErrorDegHistory = angleErrorDegHistory;
+    selection.rateErrorDegPerSecHistory = rateErrorDegPerSecHistory;
+    selection.isFeasibleHistory = isFeasibleHistory;
+    selection.idxSelected = idxCandidates(selectedCandidateIdx);
+    selection.selectedTime = tspan(idxCandidates(selectedCandidateIdx));
+    selection.defaultTime = tMatchDefault;
+    selection.defaultSampledTime = tspan(idxDefault);
+    selection.selectionText = selectionText;
+    selection.qTarget = qTargets(:, selectedCandidateIdx);
+    selection.omegaTargetBody = omegaTargets(:, selectedCandidateIdx);
+    selection.resultHistory = results;
+    selection.resultSelected = results{selectedCandidateIdx};
+end
+
+function selection = evaluate_match_time_scan_with_aero(selection, tspan, idxStartVisible, idxEruption, ...
+        idxEndVisible, XOrbitHistory, XEruption, trackingHistory, params, odeOpts)
+    if ~isempty(idxStartVisible)
+        windowIndices = idxStartVisible:idxEndVisible;
+    else
+        windowIndices = idxEruption:idxEndVisible;
+    end
+
+    windowTimes = tspan(windowIndices);
+    nCandidates = numel(selection.candidateTimes);
+    peakActuatorForceWithAero_N = nan(nCandidates, 1);
+
+    for candidateIdx = 1:nCandidates
+        idxMatch = selection.idxCandidates(candidateIdx);
+        result = selection.resultHistory{candidateIdx};
+
+        tauTotalWindow = zeros(numel(windowIndices), 3);
+        maneuverIndices = idxEruption:idxMatch;
+        maneuverInterpMethod = 'pchip';
+        if isfield(result, 'interpMethod')
+            maneuverInterpMethod = result.interpMethod;
+        end
+        tauManeuver = interp1(result.timeNodes, result.tauNodes, ...
+            tspan(maneuverIndices) - tspan(idxEruption), maneuverInterpMethod);
+        localManeuverIndices = maneuverIndices - windowIndices(1) + 1;
+        tauTotalWindow(localManeuverIndices, :) = tauManeuver;
+
+        if idxMatch < idxEndVisible
+            trackingIndices = idxMatch + 1:idxEndVisible;
+            localTrackingIndices = trackingIndices - windowIndices(1) + 1;
+            tauTotalWindow(localTrackingIndices, :) = trackingHistory.tau_track_total_history(trackingIndices, :);
+        end
+
+        tControlCandidate = tspan(idxEruption:idxEndVisible);
+        maneuverTimeNodes = tspan(idxEruption) + result.timeNodes;
+        tauTotalInterp = @(t) interpolate_maneuver_then_tracking_torque(t, maneuverTimeNodes, ...
+            result.tauNodes, tspan(idxMatch), tspan, trackingHistory.tau_track_total_history, 'previous');
+        zeroTorqueInterp = @(t) zeros(3, 1);
+        odeFunTotal = @(t, X) vleo.dynamics.sat_dynamics_openloop(t, X, params, tauTotalInterp, zeroTorqueInterp);
+        [~, XPostTotal] = ode45(odeFunTotal, tControlCandidate, XEruption, odeOpts);
+
+        XDesiredWindow = XOrbitHistory(windowIndices, :);
+        controlIndices = idxEruption:idxEndVisible;
+        localControlIndices = controlIndices - windowIndices(1) + 1;
+        XDesiredWindow(localControlIndices, :) = XPostTotal;
+
+        trackingIndices = idxMatch:idxEndVisible;
+        localTrackingIndices = trackingIndices - windowIndices(1) + 1;
+        XDesiredWindow(localTrackingIndices, 7:10) = trackingHistory.q_track_history(trackingIndices, :);
+        XDesiredWindow(localTrackingIndices, 11:13) = trackingHistory.omega_track_body_history(trackingIndices, :);
+        XDesiredWindow(:, 7:10) = vleo.util.normalize_quaternion_rows(XDesiredWindow(:, 7:10));
+        XDesiredWindow(:, 7:10) = vleo.util.align_quaternion_signs(XDesiredWindow(:, 7:10));
+
+        RDesiredWindow = vleo.util.body_to_eci_history_from_quaternion_rows(XDesiredWindow(:, 7:10));
+        if params.includeAerodynamics
+            tauAeroWindow = vleo.dynamics.estimate_aero_torque_history(windowTimes, XDesiredWindow, RDesiredWindow, params);
+        else
+            tauAeroWindow = zeros(numel(windowIndices), 3);
+        end
+
+        tauControlWindow = tauTotalWindow - tauAeroWindow;
+        peakActuatorForceWithAero_N(candidateIdx) = max(max(abs(tauControlWindow) ./ params.momentArms'));
+    end
+
+    selection.windowIndices = windowIndices;
+    selection.peakActuatorForceWithAero_N = peakActuatorForceWithAero_N;
+    selectedMask = abs(selection.candidateTimes(:) - selection.selectedTime) < 1e-12;
+    selection.peakActuatorForceWithAeroSelected_N = peakActuatorForceWithAero_N(selectedMask);
+end
+
+function isFeasible = is_match_result_feasible(result)
+    isFeasible = result.terminalAngleErrorDeg <= 5e-2 && ...
+        result.terminalRateErrorDegPerSec <= 5e-3 && ...
+        result.maxInequalityViolation <= 1e-10;
 end

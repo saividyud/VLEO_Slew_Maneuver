@@ -24,7 +24,7 @@ if ~exist('maxRollIterations', 'var')
 end
 
 clearvars -except demoSeed generateVisuals optimizeTargetRoll rollOptimizationTol maxRollIterations
-clc;
+clc; close all;
 
 if isempty(demoSeed)
     rng('shuffle', 'twister');
@@ -125,6 +125,8 @@ else
 end
 
 if generateVisuals
+    forceVerify_mN = 1e3 * abs(result.tauVerify) ./ momentArms';
+    peakForceReplay_mN = max(forceVerify_mN(:));
     nPlots = 2;
     if optimizeTargetRoll
         nPlots = 3;
@@ -151,7 +153,9 @@ if generateVisuals
     hold on;
     plot(tReplay, actualPointingErrorDeg, 'LineWidth', 1.6, 'Color', [0.05, 0.05, 0.1], ...
         'DisplayName', 'nonlinear replay');
-    yline(captureThresholdDeg, ':', 'Capture threshold', 'LineWidth', 1.0);
+    thresholdLine = yline(captureThresholdDeg, ':', 'Capture threshold', 'LineWidth', 1.0, ...
+        'HandleVisibility', 'off');
+    vleo.util.hide_from_legend(thresholdLine);
     grid on;
     xlabel('Time [s]');
     ylabel('Pointing error [deg]');
@@ -168,15 +172,18 @@ if generateVisuals
     end
 
     subplot(2, nPlots, nPlots+1);
-    plot(result.timeVerify, result.tauVerify(:, 1), 'LineWidth', 1.3, 'DisplayName', '\tau_x');
+    plot(result.timeVerify, forceVerify_mN(:, 1), 'LineWidth', 1.3, 'DisplayName', 'F_x');
     hold on;
-    plot(result.timeVerify, result.tauVerify(:, 2), 'LineWidth', 1.3, 'DisplayName', '\tau_y');
-    plot(result.timeVerify, result.tauVerify(:, 3), 'LineWidth', 1.3, 'DisplayName', '\tau_z');
+    plot(result.timeVerify, forceVerify_mN(:, 2), 'LineWidth', 1.3, 'DisplayName', 'F_y');
+    plot(result.timeVerify, forceVerify_mN(:, 3), 'LineWidth', 1.3, 'DisplayName', 'F_z');
     grid on;
     xlabel('Time [s]');
-    ylabel('Torque [N m]');
-    title('Minimax force-constrained torque command');
+    ylabel('Equivalent actuator force [mN]');
+    title('Equivalent actuator force demand');
     legend('Location', 'best');
+    text(0.03, 0.90, sprintf('Peak = %.3f mN (%.3f%% of 145 mN budget)', ...
+        peakForceReplay_mN, 100 * peakForceReplay_mN / 145), ...
+        'Units', 'normalized', 'FontSize', 10, 'BackgroundColor', 'w', 'Margin', 5);
 
     subplot(2, nPlots, nPlots+2);
     plot(result.timeVerify, rad2deg(result.omegaVerifyBody(:, 1)), '--', 'LineWidth', 1.1, 'Color', [0.2, 0.4, 0.75], ...
@@ -194,24 +201,30 @@ if generateVisuals
     ylabel('Body rate [deg/s]');
     title('Nonlinear body-rate replay');
     legend('Location', 'best');
+
+    figureStem = sprintf('supernova_repoint_demo_seed_%s', demoSeedText);
+    figureExport = vleo.util.export_paper_figure(gcf, figureStem);
+    fprintf('Paper figure saved to: %s\n', figureExport.pngPath);
+    fprintf('Paper figure saved to: %s\n', figureExport.pdfPath);
 end
 
 function [qOptimal, optimalRollDeg, gammaHistory] = optimize_target_roll( ...
         qInitial, omegaInitialBody, targetEci, omegaTargetBody, inertiaBody, ...
         maneuverDurationSec, tol, maxIterations, momentArms)
     
-    gammaHistory = [];
+    gammaHistory = zeros(maxIterations + 2, 1);
+    gammaHistoryCount = 0;
     optimalRollDeg = 0;
     qOptimal = camera_pointing_quaternion_with_roll(targetEci, 0);
     
     result = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qOptimal, ...
         omegaTargetBody, inertiaBody, maneuverDurationSec, 40, 'refineNonlinear', false, ...
         'momentArms', momentArms);
-    gammaHistory = [gammaHistory; result.gamma];
+    gammaHistoryCount = gammaHistoryCount + 1;
+    gammaHistory(gammaHistoryCount) = result.gamma;
 
     rollAnglesDeg = linspace(0, 360, 13);
     bestGamma = result.gamma;
-    bestRollDeg = 0;
 
     for rollDeg = rollAnglesDeg
         qTest = camera_pointing_quaternion_with_roll(targetEci, rollDeg);
@@ -220,17 +233,17 @@ function [qOptimal, optimalRollDeg, gammaHistory] = optimize_target_roll( ...
             'momentArms', momentArms);
         if resultTest.gamma < bestGamma
             bestGamma = resultTest.gamma;
-            bestRollDeg = rollDeg;
+            optimalRollDeg = rollDeg;
         end
     end
-    
-    optimalRollDeg = bestRollDeg;
+
     qOptimal = camera_pointing_quaternion_with_roll(targetEci, optimalRollDeg);
     
     result = vleo.control.solve_minimax_attitude_slew_fast(qInitial, omegaInitialBody, qOptimal, ...
         omegaTargetBody, inertiaBody, maneuverDurationSec, 40, 'refineNonlinear', false, ...
         'momentArms', momentArms);
-    gammaHistory = [gammaHistory; result.gamma];
+    gammaHistoryCount = gammaHistoryCount + 1;
+    gammaHistory(gammaHistoryCount) = result.gamma;
 
     searchRadiusDeg = 22.5;
     iteration = 0;
@@ -248,14 +261,13 @@ function [qOptimal, optimalRollDeg, gammaHistory] = optimize_target_roll( ...
             
             if resultTest.gamma < bestGamma - 1e-10
                 bestGamma = resultTest.gamma;
-                bestRollDeg = testRollDeg;
                 optimalRollDeg = testRollDeg;
-                qOptimal = qTest;
                 improved = true;
             end
         end
         
-        gammaHistory = [gammaHistory; bestGamma];
+        gammaHistoryCount = gammaHistoryCount + 1;
+        gammaHistory(gammaHistoryCount) = bestGamma;
         
         if ~improved
             searchRadiusDeg = searchRadiusDeg / 2;
@@ -263,6 +275,7 @@ function [qOptimal, optimalRollDeg, gammaHistory] = optimize_target_roll( ...
     end
     
     qOptimal = camera_pointing_quaternion_with_roll(targetEci, optimalRollDeg);
+    gammaHistory = gammaHistory(1:gammaHistoryCount);
 end
 
 function q = camera_pointing_quaternion_with_roll(pointingEci, rollDeg)

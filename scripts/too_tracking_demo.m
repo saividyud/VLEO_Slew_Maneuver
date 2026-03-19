@@ -13,7 +13,11 @@ if ~exist('scenarioSeed', 'var')
     scenarioSeed = [];
 end
 
-clearvars -except includeAerodynamics scenarioSeed
+if ~exist('generateVisuals', 'var')
+    generateVisuals = usejava('desktop');
+end
+
+clearvars -except includeAerodynamics scenarioSeed generateVisuals
 clc;
 
 if ~(isscalar(includeAerodynamics) && (islogical(includeAerodynamics) || isnumeric(includeAerodynamics)))
@@ -37,6 +41,12 @@ else
     error('control_test3:InvalidScenarioSeed', ...
         'scenarioSeed must be empty or a nonnegative integer scalar.');
 end
+
+if ~(isscalar(generateVisuals) && (islogical(generateVisuals) || isnumeric(generateVisuals)))
+    error('control_test3:InvalidGenerateVisuals', ...
+        'generateVisuals must be a numeric or logical scalar.');
+end
+generateVisuals = logical(generateVisuals);
 
 params = vleo.dynamics.default_control_test_params(includeAerodynamics);
 scenario = vleo.analysis.generate_too_scenario(params);
@@ -135,6 +145,7 @@ plotActualEulerDeg = verification.plotActualEulerDeg;
 ra_error = verification.ra_error;
 dec_error = verification.dec_error;
 tspan_verif = verification.tspan_verif;
+verification_pointing_error_deg = verification.pointing_error_deg;
 
 if ~isempty(ra_error)
     fprintf('Running Verification Simulation...\n');
@@ -179,70 +190,80 @@ else
     guiResults.eulerDeg = plotActualEulerDeg;
 end
 
-fprintf('Generating GUI-compatible animated results plot...\n');
-vleo.viz.animate_results(struct('results', guiResults));
-
-fprintf('Generating attitude summary plot...\n');
-figure('Name', 'Euler Angle Tracking', 'WindowStyle', 'normal', 'Position', [120 120 1500 650]);
-attitudeLayout = tiledlayout(1, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-axEuler = nexttile(attitudeLayout, 1);
-l1 = plot(axEuler, plotTime / 60, plotDesiredEulerDeg(:, 1), 'r-', 'LineWidth', 2); hold(axEuler, 'on');
-l2 = plot(axEuler, plotTime / 60, plotActualEulerDeg(:, 1), 'r--', 'LineWidth', 2);
-l3 = plot(axEuler, plotTime / 60, plotDesiredEulerDeg(:, 2), 'b-', 'LineWidth', 2);
-l4 = plot(axEuler, plotTime / 60, plotActualEulerDeg(:, 2), 'b--', 'LineWidth', 2);
-l5 = plot(axEuler, plotTime / 60, plotDesiredEulerDeg(:, 3), 'k-', 'LineWidth', 2);
-l6 = plot(axEuler, plotTime / 60, plotActualEulerDeg(:, 3), 'k--', 'LineWidth', 2);
-grid(axEuler, 'on');
-xlabel(axEuler, 'Time (minutes)', 'FontSize', 16);
-ylabel(axEuler, 'Angle (deg)', 'FontSize', 16);
-title(axEuler, 'Desired and Actual Euler Angles', 'FontSize', 18);
-legend(axEuler, [l1, l2, l3, l4, l5, l6], ...
-    {'Roll \phi desired', 'Roll \phi actual', 'Pitch \theta desired', 'Pitch \theta actual', ...
-    'Yaw \psi desired', 'Yaw \psi actual'}, 'Location', 'best', 'FontSize', 14, 'AutoUpdate', 'off');
-mark_visibility_window(axEuler, t_start_visible, scenario.t_eruption, t_end_visible, 13);
-vleo.util.set_visible_domain(axEuler, t_start_visible, t_end_visible);
-exportgraphics(gcf, vleo.util.project_path('assets', 'Euler angle tracking.png'), 'Resolution', 300)
-
-fprintf('Generating torque breakdown plots...\n');
-figure('Name', sprintf('Tracking Torque Breakdown (%s)', vleo.util.on_off_text(params.includeAerodynamics)), ...
-    'WindowStyle', 'normal', 'Position', [140 140 1450 900]);
-torqueLayout = tiledlayout(3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
-axisLabels = {'x', 'y', 'z'};
-
-for axisIdx = 1:3
-    ax = nexttile(torqueLayout, axisIdx);
-    plot(ax, tspan / 60, tau_total_history(:, axisIdx), 'k-', 'LineWidth', 2.2); hold(ax, 'on');
-    plot(ax, tspan / 60, tau_control_history(:, axisIdx), 'b-', 'LineWidth', 1.8);
-    plot(ax, tspan / 60, tau_aero_history(:, axisIdx), 'r--', 'LineWidth', 1.8);
-    grid(ax, 'on');
-    ylabel(ax, sprintf('\\tau_%s (N\\cdotm)', axisLabels{axisIdx}), 'FontSize', 16);
-    title(ax, sprintf('Body-%s Torque Component', upper(axisLabels{axisIdx})), 'FontSize', 17);
-    mark_visibility_window(ax, t_start_visible, scenario.t_eruption, t_end_visible, 13);
-    vleo.util.set_visible_domain(ax, t_start_visible, t_end_visible);
-    if axisIdx == 1
-        legend(ax, {'Total required', 'Actuator required', 'Aerodynamic disturbance'}, ...
-            'Location', 'best', 'FontSize', 13, 'AutoUpdate', 'off');
+if generateVisuals
+    if usejava('desktop')
+        fprintf('Generating GUI-compatible animated results plot...\n');
+        vleo.viz.animate_results(struct('results', guiResults));
+    else
+        fprintf('Skipping GUI animation because MATLAB desktop is unavailable.\n');
     end
-end
-xlabel(torqueLayout, 'Time (minutes)', 'FontSize', 16);
-title(torqueLayout, sprintf('Torque Breakdown with Aerodynamics %s', upper(vleo.util.on_off_text(params.includeAerodynamics))), ...
-    'FontSize', 18);
-exportgraphics(gcf, vleo.util.project_path('assets', 'Tracking torque breakdown.png'), 'Resolution', 300)
 
-if ~isempty(ra_error)
-    figure('Name', 'Verification Pointing Error', 'WindowStyle', 'normal', 'Position', [150 150 1200 600]);
-    plot(tspan_verif / 60, ra_error, 'r-', 'LineWidth', 2); hold on;
-    plot(tspan_verif / 60, dec_error, 'b--', 'LineWidth', 2);
-    xlabel('Time (minutes)', 'FontSize', 20);
-    ylabel('Pointing Error (degrees)', 'FontSize', 20);
-    title(sprintf('Verification: Pointing Error with Aerodynamics %s', upper(vleo.util.on_off_text(params.includeAerodynamics))), ...
-        'FontSize', 24);
-    legend('RA Error', 'Dec Error', 'Location', 'best', 'FontSize', 16);
-    set(gca, 'FontSize', 16);
-    grid on;
-    xlim([tspan_verif(1) / 60, tspan_verif(end) / 60]);
+    visibleMask = trackingHistory.visibility_history;
+    visibleTimesMin = tspan(visibleMask) / 60;
+    actuatorForceHistory_mN = 1e3 * abs(tau_control_history) ./ params.momentArms';
+    peakAxisForceHistory_mN = max(actuatorForceHistory_mN, [], 2);
+    visibleActuatorForceHistory_mN = actuatorForceHistory_mN(visibleMask, :);
+    visiblePeakAxisForceHistory_mN = peakAxisForceHistory_mN(visibleMask);
+    peakForceVisible_mN = max(visiblePeakAxisForceHistory_mN);
+    forceMarginFraction = peakForceVisible_mN / (145);
+
+    fprintf('Generating paper-ready TOO tracking figure...\n');
+    figure('Name', 'TOO Tracking Force and Error', 'Color', 'w', 'Position', [120 120 1180 760]);
+    paperLayout = tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    axForce = nexttile(paperLayout, 1);
+    plot(axForce, visibleTimesMin, visibleActuatorForceHistory_mN(:, 1), '-', 'LineWidth', 1.7, ...
+        'Color', [0.84 0.22 0.16], 'DisplayName', 'Body-x');
+    hold(axForce, 'on');
+    plot(axForce, visibleTimesMin, visibleActuatorForceHistory_mN(:, 2), '-', 'LineWidth', 1.7, ...
+        'Color', [0.15 0.42 0.78], 'DisplayName', 'Body-y');
+    plot(axForce, visibleTimesMin, visibleActuatorForceHistory_mN(:, 3), '-', 'LineWidth', 1.7, ...
+        'Color', [0.12 0.62 0.34], 'DisplayName', 'Body-z');
+    plot(axForce, visibleTimesMin, visiblePeakAxisForceHistory_mN, 'k-', 'LineWidth', 2.0, 'DisplayName', 'Peak axis demand');
+    grid(axForce, 'on');
+    xlabel(axForce, 'Time (minutes)', 'FontSize', 15);
+    ylabel(axForce, 'Required actuator force (mN)', 'FontSize', 15);
+    title(axForce, 'Representative TOO tracking force demand during the visible pass', 'FontSize', 16);
+    legend(axForce, 'Location', 'northwest', 'FontSize', 12);
+    mark_visibility_window(axForce, t_start_visible, scenario.t_eruption, t_end_visible, 11);
+    vleo.util.set_visible_domain(axForce, t_start_visible, t_end_visible);
+    text(axForce, 0.58, 0.92, sprintf('Peak = %.3f mN (%.3f%% of 145 mN budget)', ...
+        peakForceVisible_mN, 100 * forceMarginFraction), ...
+        'Units', 'normalized', 'FontSize', 11, 'BackgroundColor', 'w', 'Margin', 6);
+    set(axForce, 'FontSize', 12, 'LineWidth', 1.0);
+
+    axError = nexttile(paperLayout, 2);
+    if ~isempty(verification_pointing_error_deg)
+        plot(axError, tspan_verif / 60, verification_pointing_error_deg, '-', 'LineWidth', 1.9, ...
+            'Color', [0.10 0.10 0.10], 'DisplayName', 'Angular pointing error');
+        grid(axError, 'on');
+        xlabel(axError, 'Time (minutes)', 'FontSize', 15);
+        ylabel(axError, 'Pointing error (deg)', 'FontSize', 15);
+        title(axError, 'Open-loop verification error using the commanded tracking torques', 'FontSize', 16);
+        legend(axError, 'Location', 'northwest', 'FontSize', 12);
+        xlim(axError, [tspan_verif(1) / 60, tspan_verif(end) / 60]);
+        text(axError, 0.58, 0.90, sprintf('Max angular error = %.3f deg', ...
+            max(verification_pointing_error_deg)), ...
+            'Units', 'normalized', 'FontSize', 11, 'BackgroundColor', 'w', 'Margin', 6);
+        set(axError, 'FontSize', 12, 'LineWidth', 1.0);
+    else
+        axis(axError, 'off');
+        text(0.5, 0.5, 'Verification errors unavailable for this run.', ...
+            'Parent', axError, 'HorizontalAlignment', 'center', 'FontSize', 13);
+    end
+
+    title(paperLayout, sprintf('TOO tracking at %.0f km, seed %s, aerodynamics %s', ...
+        scenario.altitude / 1000, scenarioSeedText, upper(vleo.util.on_off_text(params.includeAerodynamics))), ...
+        'FontSize', 17);
+
+    figureStem = sprintf('too_tracking_force_and_error_seed_%s_aero_%s', ...
+        scenarioSeedText, vleo.util.on_off_text(params.includeAerodynamics));
+    figureExport = vleo.util.export_paper_figure(gcf, figureStem);
+    fprintf('Paper figure saved to: %s\n', figureExport.pngPath);
+    fprintf('Paper figure saved to: %s\n', figureExport.pdfPath);
+else
+    fprintf('Skipping GUI animation and figure generation (generateVisuals=false).\n');
 end
-exportgraphics(gcf, vleo.util.project_path('assets', 'Pointing error breakdown.png'), 'Resolution', 300)
 
 fprintf('\nSimulation complete!\n');
 

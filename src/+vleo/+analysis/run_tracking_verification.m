@@ -6,6 +6,7 @@ function verification = run_tracking_verification(tspan, xHistory, trackingHisto
         'plotActualEulerDeg', vleo.util.quat_history_to_euler_deg(xHistory(:, 7:10)), ...
         'ra_error', [], ...
         'dec_error', [], ...
+        'pointing_error_deg', [], ...
         'tspan_verif', [], ...
         'X_verif', []);
 
@@ -54,10 +55,18 @@ function verification = run_tracking_verification(tspan, xHistory, trackingHisto
 
     raVerifHistory = zeros(numel(verification.tspan_verif), 1);
     decVerifHistory = zeros(numel(verification.tspan_verif), 1);
+    verification.pointing_error_deg = zeros(numel(verification.tspan_verif), 1);
     for k = 1:numel(verification.tspan_verif)
         obsVerif = vleo.analysis.state_to_observation(verification.X_verif(k, :)', params);
         raVerifHistory(k) = obsVerif.ra;
         decVerifHistory(k) = obsVerif.dec;
+
+        rSatVerif = verification.X_verif(k, 1:3)';
+        [rTOO, ~] = vleo.dynamics.too_state_at_time(verification.tspan_verif(k), rTOO0, params.omega_earth);
+        apparentTOOVec = rTOO - rSatVerif;
+        apparentTOOVec = apparentTOOVec / norm(apparentTOOVec);
+        verification.pointing_error_deg(k) = rad2deg(acos(vleo.util.clamp_scalar( ...
+            dot(obsVerif.pointing_eci, apparentTOOVec), -1, 1)));
     end
 
     raTargetHistory = trackingHistory.ra_TOO_history(idxStart:idxEnd);

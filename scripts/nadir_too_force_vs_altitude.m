@@ -6,7 +6,7 @@
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectRoot);
 setup_project();
-clc;
+clc; close all;
 
 %% Configuration
 momentArms = [0.3; 0.3; 0.2];
@@ -178,6 +178,21 @@ ylabel('Peak Actuator Force (mN)', 'FontSize', 16);
 title('Nadir-Pass TOO Tracking: Max Force vs Altitude (with Aerodynamics)', 'FontSize', 18);
 legend('Location', 'northeast', 'FontSize', 13);
 xlim([altitudes_km(1), altitudes_km(end)]);
+set(gca, 'FontSize', 13, 'LineWidth', 1.0, 'YScale', 'log');
+ylim([3e-1, 3e3]);
+yticks([1e0, 1e1, 1e2, 1e3]);
+
+annotationText = sprintf([ ...
+    '145 mN crossing: %.2f km\n', ...
+    '200 km case: %.2f mN\n', ...
+    'Worst in sweep: %.1f mN at %d km'], ...
+    crossingAlt_km, maxForce_mN(end), maxForce_mN(1), altitudes_km(1));
+text(0.05, 0.82, annotationText, 'Units', 'normalized', 'FontSize', 12, ...
+    'BackgroundColor', 'w', 'Margin', 8);
+
+figureExport = vleo.util.export_paper_figure(gcf, 'nadir_too_force_vs_altitude');
+fprintf('Paper figure saved to: %s\n', figureExport.pngPath);
+fprintf('Paper figure saved to: %s\n', figureExport.pdfPath);
 
 fprintf('\nDone.\n');
 

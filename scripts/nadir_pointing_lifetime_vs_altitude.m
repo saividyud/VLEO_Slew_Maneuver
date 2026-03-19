@@ -15,6 +15,8 @@ gsi_model = 'cook';
 thrusterLayoutMode = 'standard';
 Isp_values_s = [760, 3000, 19300];
 usableFuelMass_kg = 1.5;
+lowestDemonstratedOrbit_km = 167.4;
+actuatorForceBudget_mN = 145;
 
 nIsp = numel(Isp_values_s);
 missionLife_days = zeros(nIsp, numel(altitudes_km));
@@ -52,26 +54,73 @@ for idx = 1:numel(altitudes_km)
 end
 
 figure('Color', 'w', 'Name', 'Nadir-Pointing Lifetime vs Altitude', ...
-    'Position', [120, 120, 1100, 520]);
+    'Position', [120, 120, 1100, 760]);
 
 lineColors = [0.10 0.35 0.75; 0.85 0.20 0.15; 0.10 0.60 0.25];
 lineStyles = {'o-', 's-', 'd-'};
 
-hold on;
+layout = tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+axThrust = nexttile(layout, 1);
+plot(axThrust, altitudes_km, averageTotalThrust_mN, 'o-', ...
+    'LineWidth', 1.9, 'MarkerSize', 6, ...
+    'Color', [0.05 0.32 0.68], 'MarkerFaceColor', [0.05 0.32 0.68], ...
+    'DisplayName', 'Average total thrust');
+hold(axThrust, 'on');
+plot(axThrust, altitudes_km, peakThrusterForce_mN, 's--', ...
+    'LineWidth', 1.8, 'MarkerSize', 6, ...
+    'Color', [0.85 0.25 0.12], 'MarkerFaceColor', [0.85 0.25 0.12], ...
+    'DisplayName', 'Peak single-thruster force');
+referenceLine = xline(axThrust, lowestDemonstratedOrbit_km, 'k-.', 'LineWidth', 1.2, ...
+    'Label', 'SLATS record: 167.4 km', 'LabelOrientation', 'aligned', 'FontSize', 11);
+vleo.util.hide_from_legend(referenceLine);
+budgetLine = yline(axThrust, actuatorForceBudget_mN, ':', 'LineWidth', 1.4, 'Color', [0.35 0.35 0.35], ...
+    'Label', '145 mN actuator budget', 'FontSize', 11);
+vleo.util.hide_from_legend(budgetLine);
+hold(axThrust, 'off');
+grid(axThrust, 'on');
+xlabel(axThrust, 'Altitude [km]');
+ylabel(axThrust, 'Thrust [mN]');
+title(axThrust, sprintf('%s nadir-pointing aerodynamic compensation', upper(thrusterLayoutMode)));
+legend(axThrust, 'Location', 'northeast');
+set(axThrust, 'FontSize', 13, 'LineWidth', 1.0);
+
+axLife = nexttile(layout, 2);
+hold(axLife, 'on');
+lifeLabels = { ...
+    'Electrospray-like, I_{sp} = 760 s', ...
+    'Conventional ion, I_{sp} = 3000 s', ...
+    'Advanced DS4G-like, I_{sp} = 19300 s'};
 for ispIdx = 1:nIsp
-    plot(altitudes_km, missionLife_days(ispIdx, :), lineStyles{ispIdx}, ...
-        'LineWidth', 1.8, 'MarkerSize', 6, ...
+    semilogy(axLife, altitudes_km, missionLife_days(ispIdx, :), lineStyles{ispIdx}, ...
+        'LineWidth', 1.9, 'MarkerSize', 6, ...
         'Color', lineColors(ispIdx, :), ...
         'MarkerFaceColor', lineColors(ispIdx, :), ...
-        'DisplayName', sprintf('Isp = %.0f s', Isp_values_s(ispIdx)));
+        'DisplayName', lifeLabels{ispIdx});
 end
-hold off;
-grid on;
-xlabel('Altitude [km]');
-ylabel('Mission life [days]');
-title(sprintf(['Fuel-limited mission life | %s layout | %s model\n', ...
-    '3-orbit averaging, Isp sweep = [%.0f, %.0f, %.0f] s, usable fuel = %.2f kg'], ...
-    thrusterLayoutMode, gsi_model, Isp_values_s(1), Isp_values_s(2), Isp_values_s(3), usableFuelMass_kg));
-legend('Location', 'northwest');
+referenceLine = xline(axLife, lowestDemonstratedOrbit_km, 'k-.', 'LineWidth', 1.2, ...
+    'Label', 'SLATS record altitude', 'LabelOrientation', 'aligned', 'FontSize', 11);
+vleo.util.hide_from_legend(referenceLine);
+line30 = yline(axLife, 30, ':', 'LineWidth', 1.2, 'Color', [0.35 0.35 0.35], 'Label', '30 days', 'FontSize', 11);
+vleo.util.hide_from_legend(line30);
+line365 = yline(axLife, 365, '--', 'LineWidth', 1.2, 'Color', [0.5 0.5 0.5], 'Label', '1 year', 'FontSize', 11);
+vleo.util.hide_from_legend(line365);
+hold(axLife, 'off');
+grid(axLife, 'on');
+xlabel(axLife, 'Altitude [km]');
+ylabel(axLife, 'Mission life [days]');
+title(axLife, sprintf('Fuel-limited life for %.2f kg usable propellant (%s GSI model)', usableFuelMass_kg, gsi_model));
+legend(axLife, 'Location', 'northwest');
+set(axLife, 'FontSize', 13, 'LineWidth', 1.0, 'YMinorGrid', 'on', 'YScale', 'log');
+ylim(axLife, [1, 3e3]);
+yticks(axLife, [1, 3, 10, 30, 100, 300, 1000, 3000]);
+
+title(layout, sprintf(['Nadir-pointing VLEO endurance vs altitude\n', ...
+    '%d-orbit averaging, %d samples/orbit, %s layout'], ...
+    nOrbits, samplesPerOrbit, thrusterLayoutMode), 'FontSize', 15);
+
+figureExport = vleo.util.export_paper_figure(gcf, 'nadir_pointing_lifetime_vs_altitude');
+fprintf('Paper figure saved to: %s\n', figureExport.pngPath);
+fprintf('Paper figure saved to: %s\n', figureExport.pdfPath);
 
 fprintf('\nDone.\n');

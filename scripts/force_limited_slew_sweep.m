@@ -9,7 +9,7 @@
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectRoot);
 setup_project();
-clc;
+clc; close all;
 
 vehicle = vleo.dynamics.default_vehicle_config();
 momentArms = [0.3; 0.3; 0.2];
@@ -104,6 +104,31 @@ title(sprintf('Rest-to-Rest Minimax Slew Time (F_{max} = %g mN)', forceLimit_N *
 legend('Location', 'northwest', 'FontSize', 13);
 xlim([0, 180]);
 ylim([0, inf]);
+set(gca, 'FontSize', 13, 'LineWidth', 1.0);
+
+hold on;
+referenceAnglesDeg = [45, 90, 135, 180];
+referenceAnglesRad = deg2rad(referenceAnglesDeg);
+worstAxisIdx = find(ratioIL == max(ratioIL), 1, 'first');
+worstAxisTimes = 2 * sqrt(referenceAnglesRad(:) * ratioIL(worstAxisIdx) / forceLimit_N);
+optimalAxisTimes = 2 * sqrt(referenceAnglesRad(:) * gammaOpt / forceLimit_N);
+plot(referenceAnglesDeg, worstAxisTimes, 'ko', 'MarkerSize', 6, 'MarkerFaceColor', 'k', ...
+    'DisplayName', sprintf('reference points (%s-axis)', axisNames{worstAxisIdx}));
+plot(referenceAnglesDeg, optimalAxisTimes, 'kd', 'MarkerSize', 6, 'MarkerFaceColor', [0.3, 0.3, 0.3], ...
+    'DisplayName', 'reference points (optimal axis)');
+hold off;
+
+annotationText = sprintf([ ...
+    'Worst-axis 180 deg: %.2f s\n', ...
+    'Optimal-axis 180 deg: %.2f s\n', ...
+    '145 mN force limit, L = [0.3, 0.3, 0.2] m'], ...
+    worstAxisTimes(end), optimalAxisTimes(end));
+text(0.58, 0.23, annotationText, 'Units', 'normalized', 'FontSize', 12, ...
+    'BackgroundColor', 'w', 'Margin', 8);
+
+figureExport = vleo.util.export_paper_figure(gcf, 'force_limited_slew_sweep');
+fprintf('Paper figure saved to: %s\n', figureExport.pngPath);
+fprintf('Paper figure saved to: %s\n', figureExport.pdfPath);
 
 fprintf('\nDone.\n');
 
