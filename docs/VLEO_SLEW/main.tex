@@ -42,7 +42,8 @@ This paper evaluates whether ion thrusters alone can support both agile attitude
 \noindent\begin{longtable*}{@{}l @{\quad=\quad} l@{}}
 $\boldsymbol{\beta}$ & quaternion attitude vector \\
 $\boldsymbol{\omega}$ & angular velocity vector, rad/s \\
-$\boldsymbol{H}_C$ & angular momentum about center of mass \\
+$\boldsymbol{\tau}$ & total external torque vector \\
+$\tau_i$ & body-axis control torque component \\
 $F_{\max}$ & actuator force budget per controlled axis \\
 $\bar{F}_{\mathrm{tot}}$ & orbit-averaged total thruster force \\
 $g_0$ & standard gravitational acceleration, \SI{9.80665}{\meter\per\second\squared} \\
@@ -54,7 +55,6 @@ $\dot{m}$ & propellant mass flow rate \\
 $T_{\min}$ & minimum rest-to-rest slew time \\
 $t_{\mathrm{life}}$ & propellant-limited mission life \\
 $\theta$ & angular separation between initial and target attitudes \\
-$\tau_i$ & body-axis control torque component \\
 $\gamma$ & minimax body-axis force demand, $\max_i |\tau_i|/L_i$ \\
 TOO & target of opportunity \\
 VLEO & very low Earth orbit
@@ -65,9 +65,9 @@ VLEO & very low Earth orbit
 
 Very low Earth orbit (VLEO) offers compelling advantages for Earth observation missions, including reduced launch costs for heavier payloads, enhanced geospatial imaging resolution, and improved signal-to-noise ratios for ground-directed sensors. These characteristics make VLEO particularly attractive for rapid-response applications such as wildfire detection, natural disaster coordination, and atmospheric and space-weather monitoring. However, operating below approximately \SI{300}{\kilo\meter} introduces severe environmental challenges: residual atmospheric density generates substantial aerodynamic drag that continuously depletes orbital energy, while the atomic-oxygen flux accelerates material degradation of exposed spacecraft surfaces.
 
-JAXA's TSUBAME (SLATS) technology demonstrator underscores both the promise and the difficulty of the regime. TSUBAME reached a record low sustained orbital altitude of \SI{167.4}{\kilo\meter}, and JAXA reported that the \SIrange{200}{300}{\kilo\meter} environment can impose atmospheric and atomic-oxygen exposure roughly three orders of magnitude more severe than that encountered in conventional Earth-observation orbits \cite{jaxavariety,jaxaterminate}.
+JAXA's TSUBAME (SLATS) technology demonstrator underscores both the promise and the difficulty of the regime. TSUBAME reached a record low sustained orbital altitude of \SI{167.4}{\kilo\meter}, and JAXA reported that the \SIrange{200}{300}{\kilo\meter} environment can impose atmospheric and atomic-oxygen exposure roughly three orders of magnitude more severe than that encountered in conventional Earth-observation orbits \cite{jaxavariety,jaxaterminate}. Sustaining both orbit and attitude in this environment requires continuous propulsive authority, making ion thrusters a natural candidate owing to their high specific impulse and long operational life.
 
-Ion thrusters are attractive for VLEO because of their high specific impulse, and representative hardware already spans a wide performance range. NASA's NEXT-C operates over approximately \SIrange{25}{235}{\milli\newton} \cite{nextc}. QinetiQ's T6 has published operating points up to approximately \SI{145}{\milli\newton} \cite{t6eval}. At the lower end, electrospray devices can operate near $I_{sp}=\SI{760}{\second}$ \cite{krejci2017}; conventional low-power ion engines have historically occupied the \SIrange{2000}{3000}{\second} range \cite{nasalowpower}; and ESA's DS4G concept demonstrates a substantially higher upper bound near \SI{19300}{\second} \cite{ds4goverview}. Despite their high fuel efficiency, ion thrusters produce low thrust relative to chemical systems, and their substantial electrical power requirements complicate accommodation on compact platforms \cite{ionpropulsion,ionmotors}.
+Representative ion-thruster hardware already spans a wide performance range. In terms of thrust, NASA's NEXT-C operates over approximately \SIrange{25}{235}{\milli\newton} \cite{nextc}, while QinetiQ's T6 has published operating points up to approximately \SI{145}{\milli\newton} \cite{t6eval}. In terms of specific impulse, electrospray devices can operate near $I_{sp}=\SI{760}{\second}$ \cite{krejci2017}, conventional low-power ion engines have historically occupied the \SIrange{2000}{3000}{\second} range \cite{nasalowpower}, and ESA's DS4G concept demonstrates a substantially higher upper bound near \SI{19300}{\second} \cite{ds4goverview}. However, ion thrusters produce low thrust relative to chemical systems, and their substantial electrical power requirements complicate accommodation on compact platforms \cite{ionpropulsion,ionmotors}.
 
 The central engineering question is not whether ion thrusters can generate thrust, but whether they alone can provide sufficient instantaneous control authority for agile VLEO maneuvers while simultaneously preserving useful mission life. Peak force determines whether a given maneuver is feasible at all, whereas cumulative propellant consumption determines whether the mission can remain in the useful VLEO altitude band long enough to fulfill its objectives.
 
@@ -87,12 +87,12 @@ The central finding is that ion thrusters can satisfy the instantaneous force de
 %--------------------------------------------------------------------------------------
 \subsection{Ion propulsion in the context of VLEO attitude control} \label{subsec:ion_propulsion}
 
-Ion thrusters have traditionally been employed for deep-space propulsion and long-duration orbital station-keeping, applications in which their exceptionally high specific impulse translates directly into reduced propellant mass \cite{ionpropulsion}. However, their characteristically low thrust presents a distinct challenge for VLEO attitude-control applications, where rapid reorientation toward ground targets demands agile torque authority. Additionally, small satellites operating in VLEO are subject to stringent mass and volume constraints, and the substantial electrical power required by ion systems, which typically necessitate large solar-array areas, complicates integration on compact platforms \cite{ionmotors}. This study evaluates whether the modest thrust levels characteristic of ion propulsion can nevertheless provide adequate torque for the required slew and tracking maneuvers.
+Ion thrusters have traditionally served deep-space propulsion and long-duration station-keeping, where their high specific impulse translates directly into reduced propellant mass \cite{ionpropulsion}. Repurposing them for VLEO attitude control introduces a distinct challenge: rapid reorientation toward ground targets demands agile torque authority that low-thrust actuators may struggle to provide. The stringent mass and volume constraints of small VLEO satellites, combined with the substantial electrical power that ion systems require, further complicate accommodation on compact platforms \cite{ionmotors}. This study therefore quantifies whether the modest thrust levels characteristic of ion propulsion can provide adequate torque $\boldsymbol{\tau}$ for the slew and tracking maneuvers described in Section~\ref{sec:methodology}.
 
 %--------------------------------------------------------------------------------------
 \subsection{Attitude kinematics} \label{subsec:attitude_kinematics}
 
-Multiple parameterizations exist for representing the rotational state of a rigid body in three-dimensional space, including Euler angles, direction cosine matrices, and quaternions \cite{kumar_attitudeparam}. Euler angles are intuitive but suffer from singularities at certain orientations regardless of the rotation sequence chosen. Direction cosine matrices avoid singularities through redundancy (nine elements for three rotational degrees of freedom) at the cost of increased computational complexity. Quaternions offer a favorable compromise: four parameters provide a singularity-free, minimal-redundancy representation of attitude.
+This study adopts a quaternion parameterization for spacecraft attitude. Among the common representations (Euler angles, direction cosine matrices, and quaternions \cite{kumar_attitudeparam}), quaternions offer a singularity-free, minimal-redundancy description using only four parameters, which is well suited to the large-angle slew maneuvers considered here.
 
 A quaternion $\boldsymbol{\beta} = [q_0,\, q_1,\, q_2,\, q_3]^T$ encodes the orientation of the body frame relative to a reference frame using the scalar-first convention. The kinematic differential equation relating the quaternion rate to the body angular velocity $\boldsymbol{\omega}$ is
 \begin{equation} \label{eq:qdot}
@@ -104,37 +104,37 @@ where $B[\boldsymbol{\beta}]$ is a $4\times4$ matrix constructed from the quater
 %--------------------------------------------------------------------------------------
 \subsection{Attitude kinetics} \label{subsec:attitude_kinetics}
 
-The rotational equations of motion are derived from the angular momentum principle \cite{kumar_eulerianmechanics}. The angular momentum of a rigid body about its center of mass~$C$ is
+The rotational dynamics follow from the angular momentum principle \cite{kumar_eulerianmechanics}. For a rigid body with inertia matrix $\mathbf{I}_C$ expressed in the body frame, the angular momentum about the center of mass is
 \begin{equation} \label{eq:HC}
-    \boldsymbol{H}_C = \mathbf{I}_C \,\boldsymbol{\omega},
+    \boldsymbol{H}_C = \mathbf{I}_C \,\boldsymbol{\omega}.
 \end{equation}
-where $\mathbf{I}_C$ is the inertia matrix expressed in the body frame. Applying Newton's second law for rotation and invoking the transport theorem to express the time derivative in the rotating body frame yields
+Applying the transport theorem to express the inertial time derivative in the rotating body frame gives
 \begin{equation} \label{eq:transport}
     \left(\frac{d\boldsymbol{H}_C}{dt}\right)_{\!\text{inertial}}
     = \left(\frac{d\boldsymbol{H}_C}{dt}\right)_{\!\text{body}}
     + \boldsymbol{\omega} \times \boldsymbol{H}_C.
 \end{equation}
-Equating the inertial rate of change of angular momentum to the sum of external torques $\sum \boldsymbol{L}_C$ and substituting Eq.~\eqref{eq:HC} produces Euler's rotational equation:
+Setting the inertial rate of change equal to the total external torque $\boldsymbol{\tau}$ and substituting Eq.~\eqref{eq:HC} yields Euler's rotational equation:
 \begin{equation} \label{eq:euler}
-    \sum \boldsymbol{L}_C = \mathbf{I}_C \,\dot{\boldsymbol{\omega}}
+    \boldsymbol{\tau} = \mathbf{I}_C \,\dot{\boldsymbol{\omega}}
     + \boldsymbol{\omega} \times \bigl(\mathbf{I}_C \,\boldsymbol{\omega}\bigr).
 \end{equation}
-Rearranging to isolate the angular acceleration provides the state-space form used for numerical integration:
+Rearranging for the angular acceleration gives the state-space form used throughout the simulations:
 \begin{equation} \label{eq:wdot}
     \dot{\boldsymbol{\omega}} = \mathbf{I}_C^{-1}
-    \Bigl(\sum \boldsymbol{L}_C
+    \Bigl(\boldsymbol{\tau}
     - \boldsymbol{\omega} \times \bigl(\mathbf{I}_C\,\boldsymbol{\omega}\bigr)\Bigr).
 \end{equation}
-Together, Eqs.~\eqref{eq:qdot} and~\eqref{eq:wdot} form the seven-state attitude propagation system $[\boldsymbol{\beta};\,\boldsymbol{\omega}]$ that underlies the simulations presented in this paper.
+Together, Eqs.~\eqref{eq:qdot} and~\eqref{eq:wdot} form the seven-state propagation system $[\boldsymbol{\beta};\,\boldsymbol{\omega}]$ used in all subsequent analyses.
 
 %--------------------------------------------------------------------------------------
 \subsection{Aerodynamic environment in VLEO} \label{subsec:aero_environment}
 
-In VLEO, aerodynamic drag constitutes the dominant environmental disturbance acting on a spacecraft. Although the atmosphere is highly rarefied at altitudes below \SI{300}{\kilo\meter}, the residual gas density, combined with orbital velocities exceeding \SI{7.5}{\kilo\meter\per\second}, generates substantial drag forces and torques that continuously deplete orbital energy and perturb the spacecraft attitude. The magnitude of these loads depends on atmospheric density, spacecraft velocity, the exposed cross-sectional area, and the gas--surface interaction model. Because VLEO atmospheric density varies significantly with solar activity, geomagnetic conditions, and diurnal effects, accurate drag prediction requires dynamic atmospheric modeling rather than static density assumptions.
+In VLEO, aerodynamic drag is the dominant environmental disturbance. Although the atmosphere is highly rarefied below \SI{300}{\kilo\meter}, residual gas density combined with orbital velocities exceeding \SI{7.5}{\kilo\meter\per\second} generates substantial drag forces and torques that continuously deplete orbital energy and perturb spacecraft attitude. These loads depend on atmospheric density, spacecraft velocity, exposed cross-sectional area, and the gas--surface interaction model. Because VLEO atmospheric density varies significantly with solar activity, geomagnetic conditions, and diurnal effects, the simulations in this study use dynamic atmospheric modeling rather than static density assumptions.
 
-At the altitudes considered in this study, the mean free path of atmospheric molecules greatly exceeds the characteristic dimension of the spacecraft, placing the flow firmly in the free-molecular regime (Knudsen number $\gg 1$). Under these conditions, the Navier--Stokes continuum framework is inapplicable; instead, gas--surface interaction models such as the Sentman or Cook formulations are used to compute the aerodynamic force and torque on each exposed panel individually.
+At the altitudes considered here, the mean free path of atmospheric molecules greatly exceeds the characteristic spacecraft dimension, placing the flow in the free-molecular regime (Knudsen number $\gg 1$). Under these conditions, gas--surface interaction models such as the Sentman or Cook formulations replace the inapplicable Navier--Stokes continuum framework, computing aerodynamic force and torque on each exposed panel individually.
 
-Other environmental disturbances, including gravity-gradient torques, residual magnetic dipole interactions, and solar radiation pressure, also influence attitude dynamics, but are typically at least an order of magnitude smaller than aerodynamic torques at VLEO altitudes and are not modeled explicitly in the present analysis.
+Other environmental disturbances, including gravity-gradient torques, residual magnetic dipole interactions, and solar radiation pressure, are typically at least an order of magnitude smaller than aerodynamic torques at VLEO altitudes and are not modeled in this analysis.
 
 %======================================================================================
 \section{Methodology} \label{sec:methodology}
@@ -167,7 +167,7 @@ For rest-to-rest principal-axis maneuvers, the analytic minimum slew time is
     T_{\min,k} = 2\sqrt{\frac{\theta\, I_k}{L_k\, F_{\max}}},
     \label{eq:tmin}
 \end{equation}
-where $\theta$ is the rotation angle about principal axis~$k$. For finite-time slew-to-track transitions, a minimax boundary-value solver computes the torque history that minimizes the peak body-axis force demand, with the resulting control torques converted to equivalent actuator force through Eq.~\eqref{eq:gamma}.
+where $\theta$ is the rotation angle about principal axis~$k$. For finite-time slew-to-track transitions, a minimax boundary-value solver computes the torque history $\boldsymbol{\tau}(t)$ that minimizes the peak body-axis force demand, with each component $\tau_i$ converted to equivalent actuator force through Eq.~\eqref{eq:gamma}.
 
 %--------------------------------------------------------------------------------------
 \subsection{Scenario set} \label{subsec:scenarios}
@@ -185,7 +185,7 @@ Four scenario families are evaluated.
 %--------------------------------------------------------------------------------------
 \subsection{Slew maneuver design} \label{subsec:slewing}
 
-% TODO (Connor): Describe the slew control approach.
+% TODO: Describe the slew control approach.
 % Suggested content:
 %   - Open-loop bang-bang / minimax torque profile design
 %   - Nonlinear controller (proportional gain, feedforward)
@@ -195,7 +195,7 @@ Four scenario families are evaluated.
 %--------------------------------------------------------------------------------------
 \subsection{Target tracking control} \label{subsec:tracking}
 
-% TODO (Connor): Describe the tracking control approach.
+% TODO: Describe the tracking control approach.
 % Suggested content:
 %   - Reference trajectory derivation (pointing vector, frame completeness)
 %   - Active feedback control law (PD or quaternion-error feedback)
