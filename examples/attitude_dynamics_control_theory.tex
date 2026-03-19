@@ -1,0 +1,355 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{hyperref}
+
+\title{Rigid-Body Attitude Dynamics,\\Linearized Error Models, and Feedback Tracking Control}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This document outlines the theoretical foundations for the MATLAB script \path{example_torque_free_motion.m}. The script simulates the rotational dynamics of a rigid body (a CubeSat) with zero nominal control torque, and it can also include a prescribed time-varying disturbance torque. It propagates a nominal trajectory and compares it against slightly perturbed trajectories using both the full nonlinear equations of motion and a linearized error model. The same framework also extends naturally to the case where an external torque depends on attitude angle, where feedback control is added, or where the body is tracking a time-varying nominal trajectory.
+
+\section{Nonlinear Equations of Motion}
+The rotational state of the rigid body is defined by its attitude quaternion $q$ (representing the rotation from the inertial frame to the body frame) and its angular velocity $\omega$ expressed in the body frame.
+
+\subsection{Attitude Kinematics}
+We use the scalar-first quaternion convention $q = [q_0; \vec{q}_v]^T$. The kinematic differential equation governing the evolution of the attitude quaternion is:
+\begin{equation}
+    \dot{q} = \frac{1}{2} q \otimes \begin{bmatrix} 0 \\ \omega \end{bmatrix}
+\end{equation}
+where $\otimes$ denotes quaternion multiplication.
+
+\subsection{Rigid Body Dynamics (Euler's Equations)}
+The rotational dynamics of a rigid body are governed by Euler's equation. In the most general case considered here,
+\begin{equation}
+    J \dot{\omega} + \omega \times (J\omega) = \tau_{ext}(q, \omega, t)
+\end{equation}
+where $J$ is the principal moment of inertia matrix of the body and $\tau_{ext}$ is the applied external torque, expressed in the body frame.
+
+For the torque-free script, $\tau_{ext} = 0$, so the equation reduces to:
+\begin{equation}
+    J \dot{\omega} + \omega \times (J\omega) = 0 \quad \implies \quad \dot{\omega} = -J^{-1} (\omega \times (J\omega))
+\end{equation}
+
+If a torque depends on attitude angle, then the nonlinear dynamics simply keep the same structure with a nonzero right-hand side. Typical examples are gravity-gradient torques, magnetic torques, spring-like restoring torques, or control torques generated from an attitude error law.
+
+\section{Attitude Error Representation}
+To study perturbations, we define a nominal trajectory $(q_{nom}(t), \omega_{nom}(t))$ and a perturbed trajectory $(q_{pert}(t), \omega_{pert}(t))$. 
+
+The attitude error between the nominal body frame and the perturbed body frame is represented by the error quaternion $q_{err}$, defined via the multiplicative attitude error:
+\begin{equation}
+    q_{err} = q_{nom}^{-1} \otimes q_{pert}
+\end{equation}
+For small angular deviations, the error quaternion can be approximated as:
+\begin{equation}
+    q_{err} \approx \begin{bmatrix} 1 \\ \frac{1}{2} \delta\theta \end{bmatrix}
+\end{equation}
+where $\delta\theta \in \mathbb{R}^3$ is the small-angle error vector (Euler angles) relating the nominal and perturbed body frames. Therefore, the attitude error vector can be extracted as $\delta\theta \approx 2 \vec{q}_{err, v}$.
+
+The angular rate error is simply defined as the difference between the perturbed and nominal angular rates:
+\begin{equation}
+    \delta\omega = \omega_{pert} - \omega_{nom}
+\end{equation}
+
+\section{Linearized Error Dynamics}
+To analyze stability and design linear controllers, we linearize the nonlinear kinematics and dynamics about the time-varying nominal trajectory $(\omega_{nom}(t))$. 
+
+\subsection{Linearized Kinematics}
+Taking the derivative of the attitude error vector $\delta\theta$ expressed in the rotating nominal body frame yields an extra Coriolis-like term:
+\begin{equation}
+    \delta\dot{\theta} = \delta\omega - \omega_{nom} \times \delta\theta
+\end{equation}
+This term accounts for the relative rotation of the reference frame in which the attitude error is measured.
+
+\subsection{Linearized Dynamics}
+For the torque-free case, we substitute $\omega = \omega_{nom} + \delta\omega$ into Euler's equation:
+\begin{equation}
+    J (\dot{\omega}_{nom} + \delta\dot{\omega}) = -(\omega_{nom} + \delta\omega) \times J(\omega_{nom} + \delta\omega)
+\end{equation}
+Expanding the cross products and noting that $J\dot{\omega}_{nom} = -\omega_{nom} \times J\omega_{nom}$:
+\begin{equation}
+    J\delta\dot{\omega} \approx - \delta\omega \times (J\omega_{nom}) - \omega_{nom} \times (J\delta\omega)
+\end{equation}
+where we have dropped the second-order term $\delta\omega \times (J\delta\omega)$.
+Using the anti-commutative property of the cross product ($a \times b = -b \times a$), we can rewrite $-\delta\omega \times (J\omega_{nom})$ as $(J\omega_{nom}) \times \delta\omega$. This yields the linearized dynamics implemented in the script:
+\begin{equation}
+    \delta\dot{\omega} = J^{-1} \Big[ (J\omega_{nom}) \times \delta\omega - \omega_{nom} \times (J\delta\omega) \Big]
+\end{equation}
+Using the skew-symmetric matrix operator $[\cdot]^\times$, we can factor $\delta\omega$ to the right:
+\begin{equation}
+    \delta\dot{\omega} = J^{-1} \Big( [J\omega_{nom}]^\times - [\omega_{nom}]^\times J \Big) \, \delta\omega
+\end{equation}
+Equivalently, defining the time-varying rate-error Jacobian
+\begin{equation}
+    A_{\omega}(t) = J^{-1} \Big( [J\omega_{nom}]^\times - [\omega_{nom}]^\times J \Big)
+\end{equation}
+gives the compact form
+\begin{equation}
+    \delta\dot{\omega} = A_{\omega}(t) \, \delta\omega
+\end{equation}
+
+\subsection{If the Torque Depends on Angle}
+Now suppose the external torque depends on attitude, or more generally on attitude, rate, and time:
+\begin{equation}
+    J \dot{\omega} + \omega \times (J\omega) = \tau_{ext}(q, \omega, t)
+\end{equation}
+Let the nominal trajectory satisfy
+\begin{equation}
+    J \dot{\omega}_{nom} + \omega_{nom} \times (J\omega_{nom}) = \tau_{nom}
+\end{equation}
+with $\tau_{nom} = \tau_{ext}(q_{nom}, \omega_{nom}, t)$. Linearizing the torque term gives
+\begin{equation}
+    \delta\tau \approx K_{\theta}(t) \, \delta\theta + K_{\omega}(t) \, \delta\omega
+\end{equation}
+where the Jacobian matrices are local sensitivity matrices of torque with respect to attitude error and rate error along the nominal trajectory. Equivalently,
+\begin{equation}
+    K_{\theta}(t) = \left. \frac{\partial \tau_{ext}}{\partial (\delta\theta)} \right|_{nom},
+    \qquad
+    K_{\omega}(t) = \left. \frac{\partial \tau_{ext}}{\partial (\delta\omega)} \right|_{nom}
+\end{equation}
+
+The linearized rotational dynamics become
+\begin{equation}
+    J\delta\dot{\omega} = [J\omega_{nom}]^\times \delta\omega - [\omega_{nom}]^\times J \delta\omega + \delta\tau
+\end{equation}
+or, after substituting the local torque model and collecting the $\delta\omega$ terms,
+\begin{equation}
+    \delta\dot{\omega} = J^{-1} K_{\theta} \, \delta\theta
+    + J^{-1} \Big( [J\omega_{nom}]^\times - [\omega_{nom}]^\times J + K_{\omega} \Big) \, \delta\omega
+\end{equation}
+while the kinematics remain
+\begin{equation}
+    \delta\dot{\theta} = \delta\omega - \omega_{nom} \times \delta\theta
+\end{equation}
+
+Therefore, the combined linearized system can be written in block state-space form as
+\begin{equation}
+    \begin{bmatrix}
+        \delta\dot{\theta} \\
+        \delta\dot{\omega}
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        -[\omega_{nom}]^\times & I \\
+        J^{-1} K_{\theta} & J^{-1} \Big( [J\omega_{nom}]^\times - [\omega_{nom}]^\times J + K_{\omega} \Big)
+    \end{bmatrix}
+    \begin{bmatrix}
+        \delta\theta \\
+        \delta\omega
+    \end{bmatrix}
+\end{equation}
+
+Therefore, an angle-dependent torque appears in the linearized model as an additional stiffness-like term $K_{\theta} \, \delta\theta$.
+
+\subsection{If the Torque is a PID Feedback Law}
+Now suppose the applied control torque is chosen directly from the attitude and rate errors through a PID law,
+\begin{equation}
+    \tau_{c} = -K_{P} \, \delta\theta - K_{D} \, \delta\omega - K_{I} \, \eta,
+    \qquad
+    \dot{\eta} = \delta\theta
+\end{equation}
+where $\eta(t) = \int_{0}^{t} \delta\theta(\sigma) \, d\sigma$ is the integral state. Here $K_{P}$, $K_{D}$, and $K_{I}$ are controller gains and should not be confused with the plant Jacobians $K_{\theta}$ and $K_{\omega}$ introduced above.
+
+If the plant already has local torque sensitivities, then the total linearized torque perturbation becomes
+\begin{equation}
+    \delta\tau = (K_{\theta} - K_{P}) \, \delta\theta + (K_{\omega} - K_{D}) \, \delta\omega - K_{I} \, \eta
+\end{equation}
+and the closed-loop linearized dynamics are
+\begin{align}
+    \delta\dot{\theta} &= \delta\omega - \omega_{nom} \times \delta\theta \\
+    \delta\dot{\omega} &= J^{-1} (K_{\theta} - K_{P}) \, \delta\theta \\
+    &\quad + J^{-1} \Big( [J\omega_{nom}]^\times - [\omega_{nom}]^\times J + K_{\omega} - K_{D} \Big) \, \delta\omega - J^{-1} K_{I} \, \eta \\
+    \dot{\eta} &= \delta\theta
+\end{align}
+Therefore, in block state-space form,
+\begin{equation}
+    \frac{d}{dt}
+    \begin{bmatrix}
+        \delta\theta \\
+        \delta\omega \\
+        \eta
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        -[\omega_{nom}]^\times & I & 0 \\
+        J^{-1}(K_{\theta} - K_{P}) & J^{-1} \Big( [J\omega_{nom}]^\times - [\omega_{nom}]^\times J + K_{\omega} - K_{D} \Big) & -J^{-1} K_{I} \\
+        I & 0 & 0
+    \end{bmatrix}
+    \begin{bmatrix}
+        \delta\theta \\
+        \delta\omega \\
+        \eta
+    \end{bmatrix}
+\end{equation}
+
+In the common special case of regulation about a rest equilibrium, $\omega_{nom} = 0$ and there is no additional plant stiffness or rate coupling, so $K_{\theta} = 0$ and $K_{\omega} = 0$. The equations reduce to
+\begin{align}
+    \delta\dot{\theta} &= \delta\omega \\
+    J\delta\dot{\omega} &= -K_{P} \, \delta\theta - K_{D} \, \delta\omega - K_{I} \, \eta \\
+    \dot{\eta} &= \delta\theta
+\end{align}
+
+If $J$, $K_{P}$, $K_{D}$, and $K_{I}$ are diagonal, then each principal axis decouples. For axis $i$ the characteristic polynomial is
+\begin{equation}
+    s^{3} + \frac{K_{D,i}}{J_{i}} s^{2} + \frac{K_{P,i}}{J_{i}} s + \frac{K_{I,i}}{J_{i}} = 0
+\end{equation}
+and the Routh-Hurwitz stability conditions are
+\begin{equation}
+    K_{D,i} > 0, \qquad K_{P,i} > 0, \qquad K_{I,i} > 0, \qquad K_{D,i} K_{P,i} > J_{i} K_{I,i}
+\end{equation}
+for each controlled axis. Thus, positive gains are not by themselves sufficient: the integral gain must also be small enough relative to the proportional and derivative gains.
+
+For PD control ($K_{I} = 0$), a common tuning rule is to pick a desired natural frequency $\omega_{n,i}$ and damping ratio $\zeta_{i}$ for each principal axis and set
+\begin{equation}
+    K_{P,i} = J_{i} \omega_{n,i}^{2},
+    \qquad
+    K_{D,i} = 2 \zeta_{i} J_{i} \omega_{n,i}
+\end{equation}
+For PID control, one practical approach is pole placement. If the desired closed-loop cubic for axis $i$ is
+\begin{equation}
+    s^{3} + a_{2,i} s^{2} + a_{1,i} s + a_{0,i}
+\end{equation}
+then matching coefficients gives
+\begin{equation}
+    K_{D,i} = J_{i} a_{2,i},
+    \qquad
+    K_{P,i} = J_{i} a_{1,i},
+    \qquad
+    K_{I,i} = J_{i} a_{0,i}
+\end{equation}
+
+There is no unique ``optimal'' PID gain set unless a cost function is specified. If the objective is to minimize a quadratic tradeoff between tracking error and control effort, then a more systematic approach is to augment the state with $\eta$ and solve an LQR/LQI problem of the form
+\begin{equation}
+    \min_{\tau_{c}} \int_{0}^{\infty} \left( x^{T} Q x + \tau_{c}^{T} R \, \tau_{c} \right) dt
+\end{equation}
+with $x = [\delta\theta^{T}, \, \delta\omega^{T}, \, \eta^{T}]^{T}$. The resulting feedback gain is optimal relative to the chosen weighting matrices $Q$ and $R$.
+
+\subsection{State Feedback Versus Literal PID on the Full State}
+It is often convenient to define a single state vector
+\begin{equation}
+    x = \begin{bmatrix} \delta\theta \\ \delta\omega \end{bmatrix}
+\end{equation}
+and design the controller directly in terms of $x$. This is the standard state-space viewpoint. In that setting, a proportional feedback law on the full state already has the form
+\begin{equation}
+    \tau_{c} = -Kx = -\begin{bmatrix} K_{\theta} & K_{\omega} \end{bmatrix}
+    \begin{bmatrix} \delta\theta \\ \delta\omega \end{bmatrix}
+    = -K_{\theta} \, \delta\theta - K_{\omega} \, \delta\omega
+\end{equation}
+which is exactly the familiar PD structure written in state-space form.
+
+For that reason, one usually does \emph{not} write a literal PID law on the full state as
+\begin{equation}
+    \tau_{c} = -K_{P} x - K_{D} \dot{x} - K_{I} \int x \, dt
+\end{equation}
+because the derivative term $\dot{x}$ contains $\delta\dot{\omega}$, and $\delta\dot{\omega}$ itself depends on the control torque. If the linearized dynamics are written as
+\begin{equation}
+    \dot{x} = A(t)x + B\tau_{c}
+\end{equation}
+then substituting the law above gives
+\begin{equation}
+    (I + K_{D} B) \tau_{c} = -(K_{P} + K_{D} A(t))x - K_{I} \int x \, dt
+\end{equation}
+so the controller becomes implicit and is harder to interpret physically.
+
+Likewise, integrating the entire state is usually not what is desired. In most attitude-tracking problems, the quantity to integrate is the output error that must go to zero, typically $\delta\theta$, not the full vector $[\delta\theta^{T}, \, \delta\omega^{T}]^{T}$. A cleaner formulation is therefore
+\begin{equation}
+    \tau_{c} = -K_{x} x - K_{I} z,
+    \qquad
+    \dot{z} = Cx
+\end{equation}
+where $C = [I \; 0]$ is a common choice so that $z$ integrates attitude error only. This is the standard state-feedback-plus-integral-action form and is usually preferable to a literal PID applied to the whole state vector.
+
+\subsection{If the Nominal Angular Rate Changes with Time}
+In many tracking problems, the nominal motion is not an equilibrium. Instead, $\omega_{nom}(t)$ and possibly $q_{nom}(t)$ change continuously with time. In that case, the linearized error model is no longer linear time-invariant; it becomes a linear time-varying (LTV) system because the coefficients multiplying $\delta\theta$ and $\delta\omega$ depend on time through the nominal trajectory.
+
+For trajectory tracking, it is natural to split the commanded torque into a nominal feedforward part plus an error-feedback correction:
+\begin{equation}
+    \tau(t) = \tau_{nom}(t) - K_{P} \, \delta\theta - K_{D} \, \delta\omega - K_{I} \, \eta
+\end{equation}
+where the nominal torque is the torque required for the nominal trajectory itself,
+\begin{equation}
+    \tau_{nom}(t) = J \dot{\omega}_{nom} + \omega_{nom} \times (J\omega_{nom}) - \tau_{ext}(q_{nom}, \omega_{nom}, t)
+\end{equation}
+If the external torque term has already been included in the plant model, then the controller supplies the additional correction needed to reject perturbations around that nominal motion.
+
+With this decomposition, the closed-loop linearized equations keep the same structure as above, but now with explicitly time-varying coefficients:
+\begin{align}
+    \delta\dot{\theta} &= \delta\omega - [\omega_{nom}(t)]^\times \delta\theta \\
+    \delta\dot{\omega} &= J^{-1} (K_{\theta}(t) - K_{P}) \, \delta\theta \\
+    &\quad + J^{-1} \Big( [J\omega_{nom}(t)]^\times - [\omega_{nom}(t)]^\times J + K_{\omega}(t) - K_{D} \Big) \, \delta\omega - J^{-1} K_{I} \, \eta \\
+    \dot{\eta} &= \delta\theta
+\end{align}
+Hence the state matrix is now $A_{cl}(t)$ rather than a constant matrix. This means that simple constant-coefficient characteristic-polynomial tests apply only in special cases such as equilibrium regulation.
+
+In practice, several design approaches are common:
+\begin{enumerate}
+    \item Use constant gains $K_{P}, K_{D}, K_{I}$ chosen from a local approximation, then verify performance by nonlinear simulation along the full nominal trajectory.
+    \item Use frozen-time analysis, in which the time-varying system is checked at a sequence of times $t_{k}$ by treating $\omega_{nom}(t_{k})$ as temporarily constant.
+    \item Use gain scheduling, allowing the gains to vary with the nominal operating point.
+    \item Use a time-varying optimal design such as TVLQR or TVLQI, in which the Riccati equation is solved along the nominal trajectory.
+\end{enumerate}
+
+Therefore, when $\omega_{nom}(t)$ is changing, the most natural closed-loop formulation is not pure regulation to zero but feedforward tracking plus error feedback. Constant-gain PID can still work well, but its stability and performance should be assessed over the entire trajectory rather than inferred from a single fixed characteristic polynomial.
+
+If the applied disturbance torque is a prescribed function of time only, for example a common smooth torque-noise history used in both the nominal and perturbed simulations, then it changes the nominal trajectory but does not directly enter the first-order error dynamics as a forcing term. In that common-input case, the perturbation torque satisfies $\delta\tau = 0$, so the linearized error model keeps the same form while the nominal trajectory about which it is linearized becomes time-varying.
+
+\subsection{Important Special Case: Restoring Torque}
+If the nominal motion is an equilibrium with $\omega_{nom} = 0$ and the torque is a restoring torque near that equilibrium, then a common local model is
+\begin{equation}
+    \tau_{ext}(\theta) \approx -K \, \delta\theta
+\end{equation}
+where $K$ is an attitude stiffness matrix. The linearized equations reduce to
+\begin{align}
+    \delta\dot{\theta} &= \delta\omega \\
+    J\delta\dot{\omega} &= -K \, \delta\theta
+\end{align}
+Combining the two gives the familiar second-order small-angle system
+\begin{equation}
+    J \delta\ddot{\theta} + K \, \delta\theta = 0
+\end{equation}
+which is the rotational analog of a mass-spring oscillator.
+
+If damping or active rate feedback is present, for example $\tau_{ext} \approx -K \, \delta\theta - C \, \delta\omega$, then
+\begin{equation}
+    J \delta\ddot{\theta} + C \, \delta\dot{\theta} + K \, \delta\theta = 0
+\end{equation}
+which is the rotational analog of a damped mass-spring system.
+
+\subsection{Nonlinear Angle-Dependent Torques}
+If the exact torque is nonlinear in angle, for example
+\begin{equation}
+    \tau_{ext}(\theta) = -k \sin \theta
+\end{equation}
+then the full nonlinear propagation must retain that exact torque law. The small-angle linearization replaces $\sin \theta$ with $\theta$, giving
+\begin{equation}
+    \tau_{ext}(\theta) \approx -k\theta
+\end{equation}
+which is accurate only while the attitude error remains small.
+
+\section{Conservation Laws}
+In the absence of external torques, two key quantities remain strictly conserved throughout the motion:
+\begin{enumerate}
+    \item \textbf{Angular Momentum:} The angular momentum vector $\vec{H} = J\omega$ is constant in the inertial frame. Consequently, its magnitude in the body frame, $\|\vec{H}\| = \|J\omega\|$, remains constant.
+    \item \textbf{Rotational Kinetic Energy:} The rotational kinetic energy $T_{rot} = \frac{1}{2} \omega^T J \omega$ is constant.
+\end{enumerate}
+The script verifies the numerical accuracy of the propagation by checking the drift of these two conserved quantities over time.
+
+With a nonzero external torque, these conservation laws change:
+\begin{itemize}
+    \item Angular momentum is generally no longer constant, because the external torque changes it according to $\dot{\vec{H}} = \tau_{ext}$ in the inertial frame.
+    \item Rotational kinetic energy is generally no longer constant either, because the torque can do work on the body.
+    \item If the torque is conservative and derives from a potential $U(\theta)$, then total mechanical energy,
+    \begin{equation}
+        E = \frac{1}{2} \omega^T J \omega + U(\theta)
+    \end{equation}
+    is conserved in the absence of damping and explicit time dependence.
+\end{itemize}
+
+So, for the current script, $\tau_{ext} = 0$ and the motion is torque-free. If you add a torque that depends on angle, the nonlinear dynamics gain a forcing term and the linearized error model gains the additional stiffness-like contribution described above.
+
+\end{document}
