@@ -16,9 +16,10 @@ setup_project();
 clc; close all;
 
 %% ---- Vehicle -----------------------------------------------------------
-dims_m  = [0.10, 0.20, 0.30];           % body [x, y, z] dimensions (m)
-mass_kg = 12;
-I_body  = diag([0.13, 0.10, 0.05]);     % principal inertia (kg*m^2)
+params = vleo.dynamics.default_control_test_params(true);
+dims_m  = reshape(params.bodyDims, 1, []);
+mass_kg = params.mass;
+I_body  = params.I_CB;
 
 a = dims_m(1) / 2;   % 0.05 m
 b = dims_m(2) / 2;   % 0.10 m
@@ -43,36 +44,16 @@ fprintf('  => Practical optimum   = 8 (symmetric, decoupled modes).\n\n');
 %  One thruster at each of the 8 box corners.
 %  Reaction force on satellite: inward along computed optimal diagonal.
 
-signs = [+1 +1 +1;  +1 +1 -1;  +1 -1 +1;  +1 -1 -1;
-         -1 +1 +1;  -1 +1 -1;  -1 -1 +1;  -1 -1 -1];
-nT = 8;
-
-pos = signs .* [a b c];                      % 8x3
-
-% Dynamically compute the optimal exhaust direction
-% Maximizing minimum angular acceleration with a minimum translation force constraint
-N_opt = 300;
-[AZ_opt, EL_opt] = meshgrid(linspace(0, pi/2, N_opt), linspace(0, pi/2, N_opt));
-DX_opt = cos(EL_opt) .* cos(AZ_opt);
-DY_opt = cos(EL_opt) .* sin(AZ_opt);
-DZ_opt = sin(EL_opt);
-TAU_X_opt = abs(c.*DY_opt - b.*DZ_opt);
-TAU_Y_opt = abs(a.*DZ_opt - c.*DX_opt);
-TAU_Z_opt = abs(b.*DX_opt - a.*DY_opt);
-ALPHA_X_opt = (4 * TAU_X_opt) / I_body(1,1);
-ALPHA_Y_opt = (4 * TAU_Y_opt) / I_body(2,2);
-ALPHA_Z_opt = (4 * TAU_Z_opt) / I_body(3,3);
-MIN_ALPHA_opt = min(min(ALPHA_X_opt, ALPHA_Y_opt), ALPHA_Z_opt);
-valid_mask_opt = (4*DX_opt >= 1.5) & (4*DY_opt >= 1.5) & (4*DZ_opt >= 1.5);
-MIN_ALPHA_opt(~valid_mask_opt) = -1;
-[~, max_idx_opt] = max(MIN_ALPHA_opt(:));
-
-dx = DX_opt(max_idx_opt);
-dy = DY_opt(max_idx_opt);
-dz = DZ_opt(max_idx_opt);
-
-exhaust_dir = signs .* [dx, dy, dz];          % unit outward diagonal (exhaust plume)
-force_dir = -exhaust_dir;                     % unit inward diagonal (reaction force on body)
+layout = vleo.control.corner_thruster_layout(params, 'optimized');
+signs = layout.signs;
+nT = size(signs, 1);
+pos = layout.positions_m;
+directionUnit = layout.exhaust_direction_unit.';
+dx = directionUnit(1);
+dy = directionUnit(2);
+dz = directionUnit(3);
+exhaust_dir = layout.exhaust_directions;
+force_dir = layout.force_directions;
 
 fprintf('8-THRUSTER CORNER LAYOUT\n');
 fprintf('  ID   Position [cm]             Exhaust direction (Plume)\n');
@@ -85,10 +66,7 @@ fprintf('\n');
 %% ---- Wrench matrix W (6 x 8) ------------------------------------------
 %  w_k = [ d_k ; r_k x d_k ]  (using force_dir)
 
-W = zeros(6, nT);
-for k = 1:nT
-    W(:,k) = [force_dir(k,:).'; cross(pos(k,:), force_dir(k,:)).'];
-end
+W = layout.wrench_matrix;
 
 fprintf('WRENCH MATRIX  (rows 1-3 = force, rows 4-6 = torque)\n');
 fprintf('         T1       T2       T3       T4       T5       T6       T7       T8\n');
@@ -161,9 +139,9 @@ fprintf('CONTROL AUTHORITY (per individual thruster thrust F0)\n\n');
 
 fprintf('  Translation: Fx = %.3f * F0, Fy = %.3f * F0, Fz = %.3f * F0\n\n', 4*dx, 4*dy, 4*dz);
 
-torqueArm = [abs(c*dy - b*dz), abs(a*dz - c*dx), abs(b*dx - a*dy)]; % effective arm per axis per thruster
-torqueNet = 4 * torqueArm;     % net torque from 4 thrusters
-alphaNet  = torqueNet ./ diag(I_body).';
+torqueArm = layout.torque_arms_per_thruster_m.';
+torqueNet = layout.torque_net_per_unit_thrust_Nm.';
+alphaNet  = layout.angular_accel_per_unit_thrust.';
 
 fprintf('  Axis   Torque/F0 [Nm]   Ang. accel/F0 [rad/s^2]\n');
 fprintf('  ----   --------------   -----------------------\n');
@@ -304,10 +282,6 @@ activeColor  = [0.1 0.75 0.2];
 
 % Color per axis: X=red, Y=green, Z=blue
 axClr = [0.85 0.1 0.1; 0 0.6 0; 0.1 0.3 0.9];
-
-% Per-panel view: rotation panels look DOWN the rotation axis
-panelView = [135 25; 135 25; 135 25;    % Tx Ty Tz — isometric
-              10  5; 100  5;   0 90];    % Rx Ry Rz — along axis
 
 figure('Color', 'w', 'Name', '6-DOF Firing Modes', ...
     'Position', [80 80 1500 800]);

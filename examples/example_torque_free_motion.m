@@ -1,16 +1,20 @@
 %% example_torque_free_motion.m
-%  Propagate a rigid body with no external torque and plot Euler angles.
+%  Propagate a rigid body with zero nominal control torque and plot Euler angles.
 %  Demonstrates torque-free precession / nutation for a 6U CubeSat with
 %  asymmetric inertia and an initial angular rate off the principal axes.
 %  Also shows sensitivity to +/-1% perturbation in initial body rates,
-%  and compares the nonlinear error against a linearized error model.
+%  compares the nonlinear error against a linearized error model, and can
+%  add a common smooth disturbance torque to every nonlinear case.
 %
-%  Linearized error dynamics (torque-free, about nominal trajectory):
+%  Linearized error dynamics about the nominal trajectory:
 %    state: dx = [dtheta(3x1); domega(3x1)]
-%    dtheta_dot = domega
+%    dtheta_dot = domega - skew(w_nom)*dtheta
 %    domega_dot = J^{-1} * ( skew(J*w_nom)*domega - skew(w_nom)*J*domega )
 %  where w_nom(t) is the nominal body rate at time t, obtained by
-%  interpolating the nominal nonlinear trajectory.
+%  interpolating the nominal nonlinear trajectory. If the same prescribed
+%  time-varying disturbance torque is applied to both nominal and perturbed
+%  cases, then delta-tau = 0 and the linearized error equations keep the
+%  same form while the nominal trajectory changes.
 
 projectRoot = fileparts(fileparts(mfilename('fullpath')));
 addpath(projectRoot);
@@ -18,6 +22,18 @@ setup_project();
 
 clc;
 close all;
+
+if ~exist('includeTorqueNoise', 'var')
+    includeTorqueNoise = true;
+end
+
+if ~exist('torqueNoiseStd_Nm', 'var')
+    torqueNoiseStd_Nm = 1.0e-5;
+end
+
+if ~exist('torqueNoiseSeed', 'var')
+    torqueNoiseSeed = 17;
+end
 
 %% Parameters
 c = vleo.util.constants();
@@ -50,7 +66,21 @@ tEnd_sec = 120;
 dt = 0.1;
 tSpan = 0:dt:tEnd_sec;
 odeOpts = odeset('RelTol', 1e-10, 'AbsTol', 1e-12);
-odeFun = @(t, X) vleo.dynamics.sat_dynamics_base(t, X, mu, [], [0;0;0], I_body, false);
+
+if includeTorqueNoise && torqueNoiseStd_Nm > 0
+    [tauDisturbanceHistory_Nm, disturbanceInfo] = generate_smooth_torque_disturbance( ...
+        tSpan, torqueNoiseStd_Nm, torqueNoiseSeed);
+    fprintf('Common disturbance torque enabled: RMS = [%.3e, %.3e, %.3e] N m, peak = %.3e N m\n', ...
+        disturbanceInfo.rmsPerAxis_Nm(1), disturbanceInfo.rmsPerAxis_Nm(2), ...
+        disturbanceInfo.rmsPerAxis_Nm(3), disturbanceInfo.peakAbs_Nm);
+else
+    tauDisturbanceHistory_Nm = zeros(numel(tSpan), 3);
+    disturbanceInfo = struct('rmsPerAxis_Nm', zeros(3, 1), 'peakAbs_Nm', 0, 'seed', torqueNoiseSeed);
+    fprintf('Common disturbance torque disabled.\n');
+end
+
+tauDisturbanceInterp = @(t) interpolate_vector_history(tSpan, tauDisturbanceHistory_Nm, t);
+odeFun = @(t, X) vleo.dynamics.sat_dynamics_base(t, X, mu, [], tauDisturbanceInterp(t), I_body, false);
 
 %% Propagate three nonlinear cases: nominal, +1%, -1%
 perturbFrac = 0.01;
@@ -74,6 +104,7 @@ for ic = 1:nCases
     cases(ic).eulerDeg = vleo.util.quat_history_to_euler_deg(qHist);
     cases(ic).omegaRad = XHist(:, 11:13);
     cases(ic).omegaDeg = rad2deg(XHist(:, 11:13));
+    cases(ic).tauDisturbance_Nm = interp1(tSpan, tauDisturbanceHistory_Nm, tOut, 'pchip');
 end
 
 %% Compute nonlinear error (true difference)
@@ -135,113 +166,60 @@ for k = 1:numel(cases(1).tOut)
     H_norm(k) = norm(I_body * w);
     T_rot(k) = 0.5 * w' * I_body * w;
 end
-fprintf('Nominal angular momentum drift: %.2e (relative)\n', ...
-    max(abs(H_norm - H_norm(1))) / H_norm(1));
-fprintf('Nominal rotational energy drift: %.2e (relative)\n', ...
-    max(abs(T_rot - T_rot(1))) / T_rot(1));
+if includeTorqueNoise && disturbanceInfo.peakAbs_Nm > 0
+    fprintf('Nominal angular momentum change with disturbance torque: %.2e (relative)\n', ...
+        max(abs(H_norm - H_norm(1))) / H_norm(1));
+    fprintf('Nominal rotational energy change with disturbance torque: %.2e (relative)\n', ...
+        max(abs(T_rot - T_rot(1))) / T_rot(1));
+else
+    fprintf('Nominal angular momentum drift: %.2e (relative)\n', ...
+        max(abs(H_norm - H_norm(1))) / H_norm(1));
+    fprintf('Nominal rotational energy drift: %.2e (relative)\n', ...
+        max(abs(T_rot - T_rot(1))) / T_rot(1));
+end
+for ic = 2:nCases
+    attitudeResidualDeg = cases(ic).dthetaNL_deg - cases(ic).dthetaLin_deg;
+    rateResidualDegPerSec = cases(ic).domegaNL_deg - cases(ic).domegaLin_deg;
+    fprintf('%s max attitude linearization residual: %.3e deg\n', ...
+        cases(ic).name, max(vecnorm(attitudeResidualDeg, 2, 2)));
+    fprintf('%s max rate linearization residual: %.3e deg/s\n', ...
+        cases(ic).name, max(vecnorm(rateResidualDegPerSec, 2, 2)));
+end
 
 %% Plot 1: Euler angles — all three nonlinear cases overlaid
 axLabels = {'Roll [deg]', 'Pitch [deg]', 'Yaw [deg]'};
-figure('Name', 'Torque-Free Euler Angles', 'Position', [100 100 800 600]);
-for ax = 1:3
-    subplot(3, 1, ax);
-    hold on;
-    for ic = 1:nCases
-        plot(cases(ic).tOut, cases(ic).eulerDeg(:, ax), ...
-            cases(ic).style, 'Color', cases(ic).color, 'LineWidth', 1.3);
-    end
-    ylabel(axLabels{ax});
-    grid on;
-    if ax == 1
-        title('Torque-Free Euler Angles (ZYX) — Nominal vs \pm1% Rate Perturbation');
-        legend({cases.name}, 'Location', 'best');
-    end
-end
-xlabel('Time [s]');
+plot_case_histories(cases, 'eulerDeg', axLabels, ...
+    'Torque-Free Euler Angles', ...
+    'Torque-Free Euler Angles (ZYX) — Nominal vs \pm1% Rate Perturbation');
 
 %% Plot 2: Body rates — all three nonlinear cases overlaid
 rateLabels = {'\omega_x [deg/s]', '\omega_y [deg/s]', '\omega_z [deg/s]'};
-figure('Name', 'Torque-Free Body Rates', 'Position', [100 100 800 600]);
-for ax = 1:3
-    subplot(3, 1, ax);
-    hold on;
-    for ic = 1:nCases
-        plot(cases(ic).tOut, cases(ic).omegaDeg(:, ax), ...
-            cases(ic).style, 'Color', cases(ic).color, 'LineWidth', 1.3);
-    end
-    ylabel(rateLabels{ax});
-    grid on;
-    if ax == 1
-        title('Torque-Free Body Rates — Nominal vs \pm1% Rate Perturbation');
-        legend({cases.name}, 'Location', 'best');
-    end
-end
-xlabel('Time [s]');
+plot_case_histories(cases, 'omegaDeg', rateLabels, ...
+    'Torque-Free Body Rates', ...
+    'Torque-Free Body Rates — Nominal vs \pm1% Rate Perturbation');
 
 %% Plot 3: Attitude error — nonlinear vs linearized
 errLabels = {'\delta\theta_x [deg]', '\delta\theta_y [deg]', '\delta\theta_z [deg]'};
 for ic = 2:nCases
-    figure('Name', ['Attitude Error — ' cases(ic).name], ...
-        'Position', [100 100 800 600]);
-    for ax = 1:3
-        subplot(3, 1, ax);
-        hold on;
-        plot(cases(1).tOut, cases(ic).dthetaNL_deg(:, ax), ...
-            '-', 'Color', cases(ic).color, 'LineWidth', 1.5);
-        plot(cases(1).tOut, cases(ic).dthetaLin_deg(:, ax), ...
-            '--k', 'LineWidth', 1.3);
-        ylabel(errLabels{ax});
-        grid on;
-        if ax == 1
-            title(['Attitude Error (' cases(ic).name ...
-                ') — Nonlinear (solid) vs Linearized (dashed)']);
-            legend('Nonlinear', 'Linearized', 'Location', 'best');
-        end
-    end
-    xlabel('Time [s]');
+    plot_pairwise_histories(cases(1).tOut, cases(ic).dthetaNL_deg, cases(ic).dthetaLin_deg, ...
+        errLabels, cases(ic).color, ['Attitude Error — ' cases(ic).name], ...
+        ['Attitude Error (' cases(ic).name ') — Nonlinear (solid) vs Linearized (dashed)']);
 end
 
 %% Plot 4: Rate error — nonlinear vs linearized
 dRateLabels = {'\delta\omega_x [deg/s]', '\delta\omega_y [deg/s]', '\delta\omega_z [deg/s]'};
 for ic = 2:nCases
-    figure('Name', ['Rate Error — ' cases(ic).name], ...
-        'Position', [100 100 800 600]);
-    for ax = 1:3
-        subplot(3, 1, ax);
-        hold on;
-        plot(cases(1).tOut, cases(ic).domegaNL_deg(:, ax), ...
-            '-', 'Color', cases(ic).color, 'LineWidth', 1.5);
-        plot(cases(1).tOut, cases(ic).domegaLin_deg(:, ax), ...
-            '--k', 'LineWidth', 1.3);
-        ylabel(dRateLabels{ax});
-        grid on;
-        if ax == 1
-            title(['Rate Error (' cases(ic).name ...
-                ') — Nonlinear (solid) vs Linearized (dashed)']);
-            legend('Nonlinear', 'Linearized', 'Location', 'best');
-        end
-    end
-    xlabel('Time [s]');
+    plot_pairwise_histories(cases(1).tOut, cases(ic).domegaNL_deg, cases(ic).domegaLin_deg, ...
+        dRateLabels, cases(ic).color, ['Rate Error — ' cases(ic).name], ...
+        ['Rate Error (' cases(ic).name ') — Nonlinear (solid) vs Linearized (dashed)']);
 end
 
 %% Plot 5: Linearization quality — difference between nonlinear and linearized error
 for ic = 2:nCases
-    figure('Name', ['Linearization Residual — ' cases(ic).name], ...
-        'Position', [100 100 800 600]);
-    for ax = 1:3
-        subplot(3, 1, ax);
-        hold on;
-        plot(cases(1).tOut, ...
-            cases(ic).dthetaNL_deg(:, ax) - cases(ic).dthetaLin_deg(:, ax), ...
-            '-', 'Color', cases(ic).color, 'LineWidth', 1.3);
-        ylabel(['\Delta' errLabels{ax}]);
-        grid on;
-        if ax == 1
-            title(['Linearization Residual (' cases(ic).name ...
-                ') — Nonlinear minus Linearized']);
-        end
-    end
-    xlabel('Time [s]');
+    plot_single_histories(cases(1).tOut, cases(ic).dthetaNL_deg - cases(ic).dthetaLin_deg, ...
+        strcat('\Delta', errLabels), cases(ic).color, ...
+        ['Linearization Residual — ' cases(ic).name], ...
+        ['Linearization Residual (' cases(ic).name ') — Nonlinear minus Linearized']);
 end
 
 %% Plot 6: Conserved quantities (nominal)
@@ -250,7 +228,11 @@ figure('Name', 'Conserved Quantities', 'Position', [100 100 800 400]);
 subplot(2, 1, 1);
 plot(cases(1).tOut, H_norm, 'b-', 'LineWidth', 1.3);
 ylabel('|H| [N m s]');
-title('Angular Momentum and Rotational Energy (nominal, should be constant)');
+if includeTorqueNoise && disturbanceInfo.peakAbs_Nm > 0
+    title('Angular Momentum and Rotational Energy (nominal, disturbance-driven)');
+else
+    title('Angular Momentum and Rotational Energy (nominal, should be constant)');
+end
 grid on;
 
 subplot(2, 1, 2);
@@ -258,6 +240,14 @@ plot(cases(1).tOut, T_rot * 1e3, 'r-', 'LineWidth', 1.3);
 ylabel('T_{rot} [mJ]');
 xlabel('Time [s]');
 grid on;
+
+%% Plot 7: Common disturbance torque history
+if includeTorqueNoise && disturbanceInfo.peakAbs_Nm > 0
+    disturbanceLabels = {'\tau_{d,x} [\muN m]', '\tau_{d,y} [\muN m]', '\tau_{d,z} [\muN m]'};
+    plot_single_histories(tSpan(:), tauDisturbanceHistory_Nm * 1e6, disturbanceLabels, [0.35 0.2 0.75], ...
+        'Disturbance Torque History', ...
+        sprintf('Common Smooth Disturbance Torque (seed %d)', disturbanceInfo.seed));
+end
 
 fprintf('Done.\n');
 
@@ -287,6 +277,86 @@ function dxd = linearized_error_dynamics(t, dx, J, Jinv, tNom, omegaNomRad)
     domega_dot = Jinv * (skew(Jw) * domega - skew(wNom) * J * domega);
 
     dxd = [dtheta_dot; domega_dot];
+end
+
+function [tauHistory_Nm, info] = generate_smooth_torque_disturbance(tVec, torqueStd_Nm, noiseSeed)
+    rng(noiseSeed, 'twister');
+    nModes = 6;
+    frequencies_Hz = linspace(0.03, 0.25, nModes);
+    tauHistory_Nm = zeros(numel(tVec), 3);
+    for axisIdx = 1:3
+        axisSignal = zeros(numel(tVec), 1);
+        for modeIdx = 1:nModes
+            amplitude = 0.6 + 0.8 * rand();
+            phase = 2 * pi * rand();
+            axisSignal = axisSignal + amplitude * sin(2 * pi * frequencies_Hz(modeIdx) * tVec(:) + phase);
+        end
+        axisSignal = axisSignal - mean(axisSignal);
+        axisRms = sqrt(mean(axisSignal.^2));
+        if axisRms > 0
+            axisSignal = axisSignal * (torqueStd_Nm / axisRms);
+        end
+        tauHistory_Nm(:, axisIdx) = axisSignal;
+    end
+    info = struct();
+    info.rmsPerAxis_Nm = sqrt(mean(tauHistory_Nm.^2, 1)).';
+    info.peakAbs_Nm = max(abs(tauHistory_Nm), [], 'all');
+    info.seed = noiseSeed;
+end
+
+function vec = interpolate_vector_history(timeHistory, dataHistory, t)
+    tClamped = min(max(t, timeHistory(1)), timeHistory(end));
+    vec = interp1(timeHistory, dataHistory, tClamped, 'pchip')';
+end
+
+function plot_case_histories(cases, fieldName, labels, figureName, titleText)
+    figure('Name', figureName, 'Position', [100 100 800 600]);
+    for ax = 1:3
+        subplot(3, 1, ax);
+        hold on;
+        for ic = 1:numel(cases)
+            plot(cases(ic).tOut, cases(ic).(fieldName)(:, ax), ...
+                cases(ic).style, 'Color', cases(ic).color, 'LineWidth', 1.3);
+        end
+        ylabel(labels{ax});
+        grid on;
+        if ax == 1
+            title(titleText);
+            legend({cases.name}, 'Location', 'best');
+        end
+    end
+    xlabel('Time [s]');
+end
+
+function plot_pairwise_histories(timeVec, nonlinearData, linearData, labels, color, figureName, titleText)
+    figure('Name', figureName, 'Position', [100 100 800 600]);
+    for ax = 1:3
+        subplot(3, 1, ax);
+        hold on;
+        plot(timeVec, nonlinearData(:, ax), '-', 'Color', color, 'LineWidth', 1.5);
+        plot(timeVec, linearData(:, ax), '--k', 'LineWidth', 1.3);
+        ylabel(labels{ax});
+        grid on;
+        if ax == 1
+            title(titleText);
+            legend('Nonlinear', 'Linearized', 'Location', 'best');
+        end
+    end
+    xlabel('Time [s]');
+end
+
+function plot_single_histories(timeVec, data, labels, color, figureName, titleText)
+    figure('Name', figureName, 'Position', [100 100 800 600]);
+    for ax = 1:3
+        subplot(3, 1, ax);
+        plot(timeVec, data(:, ax), '-', 'Color', color, 'LineWidth', 1.3);
+        ylabel(labels{ax});
+        grid on;
+        if ax == 1
+            title(titleText);
+        end
+    end
+    xlabel('Time [s]');
 end
 
 function S = skew(v)

@@ -31,27 +31,22 @@ function layout = corner_thruster_layout(params, layoutMode, varargin)
 
     if layoutMode == "standard"
         exhaustDirectionUnit = [1, 1, 1] / sqrt(3);
-        score = min(4 * [abs(c * exhaustDirectionUnit(2) - b * exhaustDirectionUnit(3)) / inertiaDiag(1), ...
-                         abs(a * exhaustDirectionUnit(3) - c * exhaustDirectionUnit(1)) / inertiaDiag(2), ...
-                         abs(b * exhaustDirectionUnit(1) - a * exhaustDirectionUnit(2)) / inertiaDiag(3)]);
     else
         [exhaustDirectionUnit, score] = optimize_direction(a, b, c, inertiaDiag, ...
             parser.Results.minTranslationForcePerAxis, parser.Results.gridResolution);
     end
 
+    [torqueArmX, torqueArmY, torqueArmZ] = compute_torque_arms( ...
+        exhaustDirectionUnit(1), exhaustDirectionUnit(2), exhaustDirectionUnit(3), a, b, c);
+    torqueArmsPerThruster = [torqueArmX, torqueArmY, torqueArmZ];
+    if layoutMode == "standard"
+        score = min(4 * torqueArmsPerThruster ./ inertiaDiag);
+    end
+
     pos = signs .* [a, b, c];
     exhaustDirections = signs .* exhaustDirectionUnit;
     forceDirections = -exhaustDirections;
-
-    nThrusters = size(signs, 1);
-    wrenchMatrix = zeros(6, nThrusters);
-    for idx = 1:nThrusters
-        wrenchMatrix(:, idx) = [forceDirections(idx, :).'; cross(pos(idx, :), forceDirections(idx, :)).'];
-    end
-
-    torqueArmsPerThruster = [abs(c * exhaustDirectionUnit(2) - b * exhaustDirectionUnit(3)), ...
-                             abs(a * exhaustDirectionUnit(3) - c * exhaustDirectionUnit(1)), ...
-                             abs(b * exhaustDirectionUnit(1) - a * exhaustDirectionUnit(2))];
+    wrenchMatrix = [forceDirections.'; cross(pos, forceDirections, 2).'];
 
     layout = struct();
     layout.mode = char(layoutMode);
@@ -96,9 +91,10 @@ function [exhaustDirectionUnit, score] = optimize_direction(a, b, c, inertiaDiag
     dy = cos(elevationGrid) .* sin(azimuthGrid);
     dz = sin(elevationGrid);
 
-    alphaX = 4 * abs(c .* dy - b .* dz) / inertiaDiag(1);
-    alphaY = 4 * abs(a .* dz - c .* dx) / inertiaDiag(2);
-    alphaZ = 4 * abs(b .* dx - a .* dy) / inertiaDiag(3);
+    [torqueArmX, torqueArmY, torqueArmZ] = compute_torque_arms(dx, dy, dz, a, b, c);
+    alphaX = 4 * torqueArmX / inertiaDiag(1);
+    alphaY = 4 * torqueArmY / inertiaDiag(2);
+    alphaZ = 4 * torqueArmZ / inertiaDiag(3);
 
     scoreGrid = min(min(alphaX, alphaY), alphaZ);
     validMask = (4 * dx >= minTranslationForcePerAxis) & ...
@@ -113,4 +109,10 @@ function [exhaustDirectionUnit, score] = optimize_direction(a, b, c, inertiaDiag
     end
 
     exhaustDirectionUnit = [dx(bestIndex), dy(bestIndex), dz(bestIndex)];
+end
+
+function [torqueArmX, torqueArmY, torqueArmZ] = compute_torque_arms(dx, dy, dz, a, b, c)
+    torqueArmX = abs(c .* dy - b .* dz);
+    torqueArmY = abs(a .* dz - c .* dx);
+    torqueArmZ = abs(b .* dx - a .* dy);
 end
